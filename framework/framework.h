@@ -1,13 +1,6 @@
-// ImGui - standalone example application for DirectX 11
-
-#include <imgui.h>
-#include <imgui_impl_dx11.h>
-#include <d3d11.h>
-#include <d3dcompiler.h>
-#define DIRECTINPUT_VERSION 0x0800
-#include <dinput.h>
-#include <SimpleMath.h>
-#include <xmmintrin.h>
+// Forward
+class RenderMesh;
+class RenderMaterial;
 
 extern LRESULT ImGui_ImplDX11_WndProcHandler(HWND, UINT msg, WPARAM wParam, LPARAM lParam);
 class DemoFramework
@@ -164,6 +157,8 @@ public:
         return S_OK;
     }
 
+    void RenderObj(const RenderMesh& rm, const RenderMaterial& mat);
+
     virtual void OnFrame() {};
     virtual void OnInit() {};
     virtual void OnDestroy() {};
@@ -229,6 +224,65 @@ protected:
         return DefWindowProc(hWnd, msg, wParam, lParam);
     }
 };
+#define D3DDEVICE (DemoFramework::s_instance->m_pd3dDevice)
+
+class RenderMesh
+{
+public:
+    RenderMesh()
+        : m_vcount(0), m_icount(0)
+    {
+    }
+    
+    ~RenderMesh()
+    {
+        Destroy();
+    }
+
+    void Destroy()
+    {
+        m_vb.Reset();
+        m_vb.Reset();
+    }
+
+    inline void CreateVB(int numVertices, int vertexSize, bool dynamic=true, void* initData=nullptr)
+    {
+        m_vcount = numVertices;
+        _CreateBuff(numVertices, vertexSize, D3D11_BIND_VERTEX_BUFFER, 
+            dynamic ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT,
+            initData, m_vb);
+    }
+
+    inline void CreateIB(int numIndices, int indexSize, void* initData=nullptr)
+    {
+        m_icount = numIndices;
+        _CreateBuff(numIndices, indexSize, D3D11_BIND_VERTEX_BUFFER,
+            D3D11_USAGE_DEFAULT, initData, m_ib);        
+    }
+    
+    ComPtr<ID3D11Buffer> m_vb;
+    ComPtr<ID3D11Buffer> m_ib;
+    int m_vcount;
+    int m_icount;
+
+private:
+    void _CreateBuff(int n, int s, int f0, int f1, void* id, ComPtr<ID3D11Buffer>& b)
+    {
+        D3D11_SUBRESOURCE_DATA bd = { 0 };
+        bd.pSysMem = id;
+        bd.SysMemPitch = 0;
+        bd.SysMemSlicePitch = 0;
+        CD3D11_BUFFER_DESC extbd((UINT)(n*s),(UINT)f0, (D3D11_USAGE)f1);
+        HRESULT hr = D3DDEVICE->CreateBuffer(&extbd, id ? &bd : nullptr,
+            b.ReleaseAndGetAddressOf());
+        assert(hr == S_OK);
+    }
+};
+
+class RenderMaterial
+{
+public:
+};
 
 #define IMPLEMENT_DEMO(demoClass) \
 DemoFramework* DemoFramework::s_instance = nullptr;\
@@ -244,4 +298,10 @@ int CALLBACK wWinMain(_In_ HINSTANCE , _In_ HINSTANCE , _In_ LPWSTR lpCmdLine, _
     }\
     m_renderer.Destroy();\
     return 0;\
+}
+
+
+void DemoFramework::RenderObj(const RenderMesh& rm, const RenderMaterial& mat)
+{
+
 }

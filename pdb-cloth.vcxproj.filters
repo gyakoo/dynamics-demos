@@ -36,6 +36,7 @@
     <ClInclude Include="framework\SimpleMath.h">
       <Filter>framework</Filter>
     </ClInclude>
+    <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="imgui\imgui.cpp">
@@ -51,6 +52,7 @@
       <Filter>imgui</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="pch.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="framework\SimpleMath.inl">

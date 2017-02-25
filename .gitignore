@@ -1,4 +1,8 @@
 pdb-cloth.vcxproj.user
 Debug/
 .vs
+ipch/
+*.db
+*.opendb
+
 
