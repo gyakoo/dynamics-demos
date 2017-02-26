@@ -58,6 +58,32 @@ public:
     bool m_running;
 };
 
+// Vertex struct holding position, normal vector, and texture mapping information.
+struct VertexPositionNormalTexture
+{
+    VertexPositionNormalTexture() = default;
+
+    VertexPositionNormalTexture(XMFLOAT3 const& position, XMFLOAT3 const& normal, XMFLOAT2 const& textureCoordinate)
+        : position(position),
+        normal(normal),
+        textureCoordinate(textureCoordinate)
+    { }
+
+    VertexPositionNormalTexture(FXMVECTOR position, FXMVECTOR normal, FXMVECTOR textureCoordinate)
+    {
+        XMStoreFloat3(&this->position, position);
+        XMStoreFloat3(&this->normal, normal);
+        XMStoreFloat2(&this->textureCoordinate, textureCoordinate);
+    }
+
+    XMFLOAT3 position;
+    XMFLOAT3 normal;
+    XMFLOAT2 textureCoordinate;
+
+    static const int InputElementCount = 3;
+    static const D3D11_INPUT_ELEMENT_DESC InputElements[InputElementCount];
+};
+
 class DemoFramework
 {
 public:
@@ -81,88 +107,11 @@ public:
         Destroy();
     }
 
-    HRESULT Init(const wchar_t* title, int width, int height, bool fullscreen)
-    {
-        // Create application window
-        WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, DemoFramework::WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, LoadCursor(NULL, IDC_ARROW), NULL, NULL, L"demoframework", NULL };
-        RegisterClassEx(&wc);
-        HWND hwnd = CreateWindow(L"demoframework", title, WS_OVERLAPPEDWINDOW, 100, 100, width, height, NULL, NULL, wc.hInstance, NULL);
-
-        // Setup swap chain
-        DXGI_SWAP_CHAIN_DESC sd;
-        {
-            ZeroMemory(&sd, sizeof(sd));
-            sd.BufferCount = 2;
-            sd.BufferDesc.Width = 0;
-            sd.BufferDesc.Height = 0;
-            sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            sd.BufferDesc.RefreshRate.Numerator = 60;
-            sd.BufferDesc.RefreshRate.Denominator = 1;
-            sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-            sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-            sd.OutputWindow = hwnd;
-            sd.SampleDesc.Count = 1;
-            sd.SampleDesc.Quality = 0;
-            sd.Windowed = !fullscreen;
-            sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-        }
-
-        UINT createDeviceFlags = 0;
-#ifdef _DEBUG
-        createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
-        D3D_FEATURE_LEVEL featureLevel;
-        const D3D_FEATURE_LEVEL featureLevelArray[1] = { D3D_FEATURE_LEVEL_11_0, };
-        if (D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, createDeviceFlags, featureLevelArray, 1, D3D11_SDK_VERSION, &sd, &m_pSwapChain, &m_pd3dDevice, &featureLevel, &m_pd3dDeviceContext) != S_OK)
-            return E_FAIL;
-
-        // Setup rasterizer
-        {
-            D3D11_RASTERIZER_DESC RSDesc;
-            memset(&RSDesc, 0, sizeof(D3D11_RASTERIZER_DESC));
-            RSDesc.FillMode = D3D11_FILL_SOLID;
-            RSDesc.CullMode = D3D11_CULL_NONE;
-            RSDesc.FrontCounterClockwise = FALSE;
-            RSDesc.DepthBias = 0;
-            RSDesc.SlopeScaledDepthBias = 0.0f;
-            RSDesc.DepthBiasClamp = 0;
-            RSDesc.DepthClipEnable = TRUE;
-            RSDesc.ScissorEnable = TRUE;
-            RSDesc.AntialiasedLineEnable = FALSE;
-            RSDesc.MultisampleEnable = (sd.SampleDesc.Count > 1) ? TRUE : FALSE;
-
-            ID3D11RasterizerState* pRState = NULL;
-            m_pd3dDevice->CreateRasterizerState(&RSDesc, &pRState);
-            m_pd3dDeviceContext->RSSetState(pRState);
-            pRState->Release();
-        }
-
-        // Show the window
-        ShowWindow(hwnd, SW_SHOWDEFAULT);
-        UpdateWindow(hwnd);
-
-        // Setup ImGui binding
-        ImGui_ImplDX11_Init(hwnd, m_pd3dDevice, m_pd3dDeviceContext);
-
-        for (auto& d : m_demos)
-            d->OnInitFramework();            
-        return S_OK;
-    }
-
-    void Destroy()
-    {
-        if (!m_pd3dDevice)
-            return;
-
-        for (auto& d : m_demos)
-            d->OnDestroyFramework();
-        ImGui_ImplDX11_Shutdown();
-        CleanupRenderTarget();
-        if (m_pSwapChain) { m_pSwapChain->Release(); m_pSwapChain = NULL; }
-        if (m_pd3dDeviceContext) { m_pd3dDeviceContext->Release(); m_pd3dDeviceContext = NULL; }
-        if (m_pd3dDevice) { m_pd3dDevice->Release(); m_pd3dDevice = NULL; }
-        UnregisterClass(L"demoframework", NULL);
-    }
+    HRESULT Init(const wchar_t* title, int width, int height, bool fullscreen);
+    HRESULT InitShaders();
+    void PreRender();
+    void PostRender();
+    void Destroy();
 
     HRESULT Frame()
     {
@@ -179,14 +128,18 @@ public:
                     return E_FAIL;
                 continue;
             }
+            const float rgba[4] = { 0.5f, 0.5f, 0.9f, 1.0f };
+            m_pd3dDeviceContext->ClearRenderTargetView(m_mainRenderTargetView, rgba);
+
+            PreRender();
             for (auto& d : m_demos)
             {
                 d->OnStepFramework();
                 if ( d->m_running )
                     d->OnStepDemo();
             }
-            float rgba[4] = { 0.5f, 0.5f, 0.9f, 1.0f };
-            m_pd3dDeviceContext->ClearRenderTargetView(m_mainRenderTargetView, rgba);
+            PostRender();
+
             ImGui_ImplDX11_NewFrame();
             RenderGui();
             ImGui::Render();
@@ -250,7 +203,7 @@ public:
         ImGui::End();
     }
 
-    void RenderObj(const RenderMesh& rm, const RenderMaterial& mat);
+    void RenderObj(const RenderMesh& rm, const RenderMaterial& mat, const Matrix& transform);
     
     std::vector<std::shared_ptr<Demo>> m_demos;
     
@@ -268,6 +221,15 @@ public:
     ID3D11DeviceContext*     m_pd3dDeviceContext;
     IDXGISwapChain*          m_pSwapChain;
     ID3D11RenderTargetView*  m_mainRenderTargetView;
+    ComPtr<ID3D11VertexShader> m_vsPNT;
+    ComPtr<ID3D11PixelShader> m_psPNT;
+    ComPtr<ID3D11InputLayout> m_ilPNT;
+    ComPtr<ID3D11Buffer>      m_cbMVP;
+    ComPtr<ID3D11Buffer>      m_cbF4;
+    ComPtr<ID3D11SamplerState> m_linearClamp;
+
+    Matrix m_view;
+    Matrix m_proj;
 protected:
 
     void CreateRenderTarget()
@@ -323,12 +285,13 @@ protected:
     }
 };
 #define D3DDEVICE (DemoFramework::GetInstance()->m_pd3dDevice)
+#define D3DCONTEXT (DemoFramework::GetInstance()->m_pd3dDeviceContext)
 
 class RenderMesh
 {
 public:
     RenderMesh()
-        : m_vcount(0), m_icount(0)
+        : m_vcount(0), m_vsize(0), m_vdyn(false), m_icount(0)
     {
     }
     
@@ -346,6 +309,8 @@ public:
     inline void CreateVB(int numVertices, int vertexSize, bool dynamic=true, void* initData=nullptr)
     {
         m_vcount = numVertices;
+        m_vsize = vertexSize;
+        m_vdyn = dynamic;
         _CreateBuff(numVertices, vertexSize, D3D11_BIND_VERTEX_BUFFER, 
             dynamic ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT,
             initData, m_vb);
@@ -357,11 +322,20 @@ public:
         _CreateBuff(numIndices, indexSize, D3D11_BIND_VERTEX_BUFFER,
             D3D11_USAGE_DEFAULT, initData, m_ib);        
     }
+
+    inline void UpdateVB(void* data) 
+    { 
+        if (m_vdyn)
+            _UpdateBuff(data, m_vb);
+        else
+            CreateVB(m_vcount, m_vsize, m_vdyn, data);
+    } // entire subresource
     
     ComPtr<ID3D11Buffer> m_vb;
     ComPtr<ID3D11Buffer> m_ib;
-    int m_vcount;
+    int m_vcount, m_vsize;
     int m_icount;
+    bool m_vdyn;
 
 private:
     void _CreateBuff(int n, int s, int f0, int f1, void* id, ComPtr<ID3D11Buffer>& b)
@@ -375,9 +349,21 @@ private:
             b.ReleaseAndGetAddressOf());
         assert(hr == S_OK);
     }
+
+    inline void _UpdateBuff(void* data, ComPtr<ID3D11Buffer>& b)
+    {
+        D3DCONTEXT->UpdateSubresource(b.Get(), 0, 0, data, 0, 0);
+    }
 };
 
 class RenderMaterial
 {
 public:
+    RenderMaterial(const Vector4& modColor)
+        : m_modulateColor(1,1,1,1)
+    {}
+    Vector4 m_modulateColor;
+
+
+    static RenderMaterial White;
 };

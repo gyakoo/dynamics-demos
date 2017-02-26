@@ -67,6 +67,7 @@ namespace DX {}; // to compile using clausule below
 #include <xmmintrin.h>
 
 // -- GLOBAL USING 
+using namespace DirectX;
 using namespace DirectX::SimpleMath;
 using namespace Microsoft::WRL;
 

@@ -55,10 +55,24 @@
     <ClCompile Include="ClothSimpleDemo.cpp" />
     <ClCompile Include="framework\framework.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="framework\SimpleMath.cpp">
+      <Filter>framework</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="framework\SimpleMath.inl">
       <Filter>framework</Filter>
     </None>
+    <None Include="framework\ShaderCommon.hlsli">
+      <Filter>framework</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="framework\VS_PNT.hlsl">
+      <Filter>framework</Filter>
+    </FxCompile>
+    <FxCompile Include="framework\PS_PNT.hlsl">
+      <Filter>framework</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>
