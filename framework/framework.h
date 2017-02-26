@@ -1,20 +1,81 @@
+#pragma once
+#define DEMO(demoClass, demoName, demoDesc) \
+    struct _##demoClass \
+    {\
+        _##demoClass()\
+        { \
+            DemoFramework::GetInstance()->RegisterDemo<demoClass>(demoName, demoDesc);\
+        }\
+    }_##demoClass_Instance;
+
+//
+//
+//
+#define DEMOFRAMEWORK_MAIN() \
+int CALLBACK wWinMain(_In_ HINSTANCE , _In_ HINSTANCE , _In_ LPWSTR, _In_ int )\
+{\
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);\
+    DemoFramework* demoFramework = DemoFramework::GetInstance();\
+    if (SUCCEEDED(demoFramework->Init(L"DemoFramework", 1600, 900, false)))\
+    {\
+        while (SUCCEEDED(demoFramework->Frame()))\
+        {\
+        }\
+    }\
+    demoFramework->Destroy();\
+    return 0;\
+}
+
 // Forward
 class RenderMesh;
 class RenderMaterial;
+class DemoFramework;
 
 extern LRESULT ImGui_ImplDX11_WndProcHandler(HWND, UINT msg, WPARAM wParam, LPARAM lParam);
+
+class Demo
+{
+public:
+    Demo()
+        : m_framework(nullptr)
+        , m_running(false)
+    {}
+
+    virtual void OnInitDemo() {};
+    virtual void OnDestroyDemo() {};
+    virtual void OnStepDemo() {};
+    virtual void OnRenderGui() {};
+    virtual void OnRenderGuiSetup() {};
+
+    virtual void OnInitFramework() {};
+    virtual void OnDestroyFramework() {};
+    virtual void OnStepFramework() {};
+    virtual void OnWndProc(HWND, UINT, WPARAM, LPARAM) {}
+
+    DemoFramework* m_framework;
+    std::string m_name;
+    std::string m_desc;
+    bool m_running;
+};
+
 class DemoFramework
 {
 public:
+
+    static DemoFramework* GetInstance()
+    {
+        static DemoFramework s_instance;
+        return &s_instance;
+    }
+
     DemoFramework()
         : m_mainRenderTargetView(nullptr)
         , m_pd3dDevice(nullptr)
         , m_pd3dDeviceContext(nullptr)
         , m_pSwapChain(nullptr)
     {
-        s_instance = this;
-
     }
+
     ~DemoFramework()
     {
         Destroy();
@@ -83,13 +144,18 @@ public:
         // Setup ImGui binding
         ImGui_ImplDX11_Init(hwnd, m_pd3dDevice, m_pd3dDeviceContext);
 
-        OnInit();
+        for (auto& d : m_demos)
+            d->OnInitFramework();            
         return S_OK;
     }
 
     void Destroy()
     {
-        OnDestroy();
+        if (!m_pd3dDevice)
+            return;
+
+        for (auto& d : m_demos)
+            d->OnDestroyFramework();
         ImGui_ImplDX11_Shutdown();
         CleanupRenderTarget();
         if (m_pSwapChain) { m_pSwapChain->Release(); m_pSwapChain = NULL; }
@@ -100,10 +166,6 @@ public:
 
     HRESULT Frame()
     {
-        bool show_test_window = true;
-        bool show_another_window = false;
-        ImVec4 clear_col = ImColor(114, 144, 154);
-
         // Main loop
         MSG msg;
         ZeroMemory(&msg, sizeof(msg));
@@ -117,54 +179,90 @@ public:
                     return E_FAIL;
                 continue;
             }
-
-            OnFrame();
-
+            for (auto& d : m_demos)
+            {
+                d->OnStepFramework();
+                if ( d->m_running )
+                    d->OnStepDemo();
+            }
+            float rgba[4] = { 0.5f, 0.5f, 0.9f, 1.0f };
+            m_pd3dDeviceContext->ClearRenderTargetView(m_mainRenderTargetView, rgba);
             ImGui_ImplDX11_NewFrame();
-
-            // 1. Show a simple window
-            // Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
-            {
-                static float f = 0.0f;
-                ImGui::Text("Hello, world!");
-                ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-                ImGui::ColorEdit3("clear color", (float*)&clear_col);
-                if (ImGui::Button("Test Window")) show_test_window ^= 1;
-                if (ImGui::Button("Another Window")) show_another_window ^= 1;
-                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            }
-
-            // 2. Show another simple window, this time using an explicit Begin/End pair
-            if (show_another_window)
-            {
-                ImGui::SetNextWindowSize(ImVec2(200, 100), ImGuiSetCond_FirstUseEver);
-                ImGui::Begin("Another Window", &show_another_window);
-                ImGui::Text("Hello");
-                ImGui::End();
-            }
-
-            // 3. Show the ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
-            if (show_test_window)
-            {
-                ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);     // Normally user code doesn't need/want to call it because positions are saved in .ini file anyway. Here we just want to make the demo initial state a bit more friendly!
-                ImGui::ShowTestWindow(&show_test_window);
-            }
-
-            m_pd3dDeviceContext->ClearRenderTargetView(m_mainRenderTargetView, (float*)&clear_col);
+            RenderGui();
             ImGui::Render();
             m_pSwapChain->Present(0, 0);
         }
         return S_OK;
     }
 
+    void RenderGui()
+    {
+        for (auto& d : m_demos)
+            if (d->m_running)
+                d->OnRenderGui();
+
+        ImGuiWindowFlags window_flags = 0;
+        //window_flags |= ImGuiWindowFlags_ShowBorders;
+        //window_flags |= ImGuiWindowFlags_NoTitleBar;
+        //window_flags |= ImGuiWindowFlags_NoResize;
+        //window_flags |= ImGuiWindowFlags_NoMove;
+        //window_flags |= ImGuiWindowFlags_NoScrollbar;
+        //window_flags |= ImGuiWindowFlags_NoCollapse;
+        //window_flags |= ImGuiWindowFlags_MenuBar;
+        static bool opened = true;
+        if (!ImGui::Begin("Demo Framework", &opened, ImVec2(400, 400), 0.65f, window_flags))
+        {
+            ImGui::End();
+            return;
+        }
+
+        ImGui::Text("Select a demo below");
+
+        for (auto& d : m_demos)
+        {
+            if (ImGui::CollapsingHeader(d->m_name.c_str()))
+            {
+                ImGui::TextWrapped(d->m_desc.c_str());
+                ImGui::Spacing();
+                ImGui::Text("Configure and press Run");
+                if (!d->m_running)
+                {
+                    if (ImGui::Button("Run"))
+                    {
+                        d->m_running = true;
+                        d->OnInitDemo();
+                    }
+                    ImGui::SameLine();
+                }
+                if (d->m_running && ImGui::Button("Stop"))
+                {
+                    d->OnDestroyDemo();
+                    d->m_running = false;
+                }
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();                
+                if (!d->m_running)
+                    d->OnRenderGuiSetup();
+            }
+        }
+        ImGui::End();
+    }
+
     void RenderObj(const RenderMesh& rm, const RenderMaterial& mat);
-
-    virtual void OnFrame() {};
-    virtual void OnInit() {};
-    virtual void OnDestroy() {};
-    virtual void OnWndProc(HWND , UINT , WPARAM , LPARAM ) {}
-
-    static DemoFramework* s_instance;
+    
+    std::vector<std::shared_ptr<Demo>> m_demos;
+    
+    template<typename T>
+    void RegisterDemo(const std::string& name, const std::string& desc)
+    {
+        auto demo = std::make_shared<T>();
+        demo->m_name = name;
+        demo->m_desc = desc;
+        demo->m_framework = this;
+        m_demos.push_back(demo);
+    }
 
     ID3D11Device*            m_pd3dDevice;
     ID3D11DeviceContext*     m_pd3dDeviceContext;
@@ -199,7 +297,7 @@ protected:
         if (ImGui_ImplDX11_WndProcHandler(hWnd, msg, wParam, lParam))
             return true;
 
-        DemoFramework* instance = DemoFramework::s_instance;
+        DemoFramework* instance = DemoFramework::GetInstance();
         switch (msg)
         {
         case WM_SIZE:
@@ -224,7 +322,7 @@ protected:
         return DefWindowProc(hWnd, msg, wParam, lParam);
     }
 };
-#define D3DDEVICE (DemoFramework::s_instance->m_pd3dDevice)
+#define D3DDEVICE (DemoFramework::GetInstance()->m_pd3dDevice)
 
 class RenderMesh
 {
@@ -283,25 +381,3 @@ class RenderMaterial
 {
 public:
 };
-
-#define IMPLEMENT_DEMO(demoClass) \
-DemoFramework* DemoFramework::s_instance = nullptr;\
-int CALLBACK wWinMain(_In_ HINSTANCE , _In_ HINSTANCE , _In_ LPWSTR lpCmdLine, _In_ int )\
-{\
-    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON); \
-    demoClass m_renderer;\
-    if (SUCCEEDED(m_renderer.Init(L#demoClass, 1600, 900, false)))\
-    {\
-        while (SUCCEEDED(m_renderer.Frame()))\
-        {\
-        }\
-    }\
-    m_renderer.Destroy();\
-    return 0;\
-}
-
-
-void DemoFramework::RenderObj(const RenderMesh& rm, const RenderMaterial& mat)
-{
-
-}

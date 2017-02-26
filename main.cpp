@@ -1,23 +1,10 @@
 #include "pch.h"
 #include "framework.h"
 
-class PDBClothDemo : public DemoFramework
-{
-public:
-    virtual void OnInit() override
-    {
-        // Cetup camera
+// This must be included once in any cpp of the app, 
+// this implements the entry function.
+//
+// To Add your own demos, inherit from Demo and use the macro DEMO()
+//
+DEMOFRAMEWORK_MAIN();
 
-        // Create cloth mesh
-        m_mesh = std::make_shared<Mesh>();
-    }
-        
-    virtual void OnFrame() override
-    {
-        // Render Cloth Mesh
-    }
-
-    std::shared_ptr<Mesh> m_mesh;
-};
-
-IMPLEMENT_DEMO(PDBClothDemo);
