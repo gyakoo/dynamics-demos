@@ -20,5 +20,5 @@ float4 main(PSInput_PositionNormalTexture input) : SV_TARGET
     const float halfL = 0.5f*(dot(input.normal, toLight) + 1.0f);
     const float shadeInt = ceil(halfL*halfL*numShads) / numShads;
     texColor.rgb *= shadeInt;
-    return texColor*modulate + ambient;
+    return modulate;// texColor*modulate + ambient;
 }

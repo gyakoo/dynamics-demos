@@ -108,7 +108,7 @@ public:
     }
 
     HRESULT Init(const wchar_t* title, int width, int height, bool fullscreen);
-    HRESULT InitShaders();
+    HRESULT InitResources();
     void PreRender();
     void PostRender();
     void Destroy();
@@ -217,6 +217,7 @@ public:
         m_demos.push_back(demo);
     }
 
+    int m_width, m_height;
     ID3D11Device*            m_pd3dDevice;
     ID3D11DeviceContext*     m_pd3dDeviceContext;
     IDXGISwapChain*          m_pSwapChain;
@@ -319,7 +320,7 @@ public:
     inline void CreateIB(int numIndices, int indexSize, void* initData=nullptr)
     {
         m_icount = numIndices;
-        _CreateBuff(numIndices, indexSize, D3D11_BIND_VERTEX_BUFFER,
+        _CreateBuff(numIndices, indexSize, D3D11_BIND_INDEX_BUFFER,
             D3D11_USAGE_DEFAULT, initData, m_ib);        
     }
 
@@ -361,9 +362,12 @@ class RenderMaterial
 public:
     RenderMaterial(const Vector4& modColor)
         : m_modulateColor(1,1,1,1)
-    {}
-    Vector4 m_modulateColor;
+    {
+    }
 
+    Vector4 m_modulateColor;
+    ComPtr<ID3D11Texture2D> m_texture0;
+    ComPtr<ID3D11ShaderResourceView> m_srv0;
 
     static RenderMaterial White;
 };
