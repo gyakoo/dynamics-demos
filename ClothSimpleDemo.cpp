@@ -1,6 +1,86 @@
 #include "pch.h"
 #include "framework.h"
 
+namespace NaiveClothInternals
+{
+    static int SOLVER_ITER = 3;
+    static float CLOTH_PARTICLE_MASS = 0.05f;
+    static float TIMESTEP_FACTOR = 1.1f;
+    static float BASE_STIFFNESS = 1.0f;
+    static float COMPUTED_SUBSTIFFNESS = .0f; // auto computed, just to display
+    static const float CLOTHWIDTH = 8.0f;
+    
+    enum    
+    {
+        CLOTH_DIM = 16,
+        CLOTH_NUM_PARTICLES = CLOTH_DIM*CLOTH_DIM,
+        CLOTH_NUM_DISTANCE_CONSTRAINTS = (2 * (CLOTH_DIM - 1)*(2 * CLOTH_DIM - 1)) // each particle with its neighbors
+    };
+
+    static inline uint16_t PINDEX(uint16_t i, uint16_t j)
+    {
+        return (i + j*CLOTH_DIM);
+    }
+
+    template<typename V>
+    inline V clamp(const V& v, const V& t, const V& q)
+    {
+        return v < t ? t : (v>q?q:v);
+    }
+
+    struct Sphere
+    {
+        Vector3 m_center;
+        float m_radius;
+    };
+
+    struct ClothParticle
+    {
+        Vector3 m_prevPos;
+        Vector3 m_pos;
+        Vector3 m_vel;
+        float m_invMass;
+        float m_collStiffness;
+    };
+
+    struct ConstraintDistance
+    {
+        uint16_t m_particleA;
+        uint16_t m_particleB;
+        float m_restDistance;
+    };
+
+    // particles based, not triangle
+    struct ConstraintCollisionParticleSphere
+    {
+        uint16_t m_particle;
+        Vector3 m_hitPoint;
+    };
+
+    struct ClothMesh
+    {
+        //ClothParticle m_particles[CLOTH_NUM_PARTICLES];
+        std::vector<ClothParticle> m_particles;
+        ConstraintDistance m_distanceConstraints[CLOTH_NUM_DISTANCE_CONSTRAINTS];
+        std::vector<ConstraintCollisionParticleSphere> m_collisionConstraints;
+
+        void init();
+        void step(float timestep);
+        void display();
+
+        void _windFieldAccel(const Vector3& xyz, float time, float invPMass, Vector3& accelOut);
+        void _buildDistanceConstraint(uint16_t iA, uint16_t iB, int at);
+        void _generateCollisionConstraints();
+
+        float m_simTime;
+        Sphere m_sphere;
+        float m_windStrength;
+        bool m_windEnabled;
+        bool m_sphereAnimated;
+    };
+};
+
+
 class ClothSimpleDemo : public Demo
 {
 public:
@@ -10,60 +90,26 @@ public:
 
     virtual void OnInitDemo() override
     {
-        // Cetup camera
-
         // Create cloth mesh
-        m_mesh = std::make_shared<RenderMesh>();
-
-        const int DIM = 32;
-        const float sep = 0.05f;
-        const int NPOINTS = DIM*DIM;
-        const int NINDICES = (DIM - 1) * (DIM - 1) * 6;
-        float x;
-        float y = DIM*sep*0.5f;
-#define offs(i,j) ((j)*DIM+(i))
-        VertexPositionNormalTexture points[NPOINTS];
-        uint32_t indices[NINDICES];
-        int c = 0;
-        for (int j = 0; j < DIM; ++j)
-        {
-            x = -DIM*sep*0.5f;
-            for (int i = 0; i < DIM; ++i, ++c, x+=sep)
-            {
-                auto& p = points[c];
-                p.position = Vector3(x, y, 0);
-                p.normal = Vector3(0, 0, -1);
-                p.textureCoordinate = Vector2::Zero;
-            }
-            y -= sep;
-        }
-        c = 0;
-        for (int j = 0; j < DIM-1; ++j)
-        {
-            for (int i = 0; i < DIM-1; ++i)
-            {
-                indices[c++] = offs(i, j);
-                indices[c++] = offs(i+1, j);
-                indices[c++] = offs(i+1, j+1);
-
-                indices[c++] = offs(i, j);
-                indices[c++] = offs(i+1, j+1);
-                indices[c++] = offs(i, j+1);
-            }
-        }
-        m_mesh->CreateIB(NINDICES, sizeof(uint32_t), indices);
-        m_mesh->CreateVB(NPOINTS, sizeof(VertexPositionNormalTexture), false, points);
+        m_renderMesh = std::make_shared<RenderMesh>();
+        m_simulationMesh.init();
+        m_framework->m_timeStep = 1.0f / 60.0f;
     }
 
     virtual void OnDestroyDemo() override
     {
-        m_mesh.reset();
+        m_renderMesh.reset();
     }
 
     virtual void OnStepDemo() override
     {
         // Render Cloth Mesh
-        m_framework->RenderObj(*m_mesh.get(), RenderMaterial::White, Matrix::Identity);
+        m_framework->RenderObj(*m_renderMesh.get(), RenderMaterial::White, Matrix::Identity);
+
+        const float timeStep = m_framework->m_timeStep * NaiveClothInternals::TIMESTEP_FACTOR;
+        m_simulationMesh.step(timeStep);
+
+        UpdateAndRenderClothMesh();
     }
 
     virtual void OnRenderGuiSetup() override
@@ -77,10 +123,369 @@ public:
 
     virtual void OnRenderGui() override
     {
-        ImGui::Text("Hello, world!");
+        const int height = 380;        
+        {
+            static char text[128];
+            ImGui::Checkbox("Wind", &m_simulationMesh.m_windEnabled);
+            ImGui::Checkbox("Animate bal", &m_simulationMesh.m_sphereAnimated);
+
+            // 
+            const int sliderWidth = 200;
+            ImGui::SliderFloat("Wind Strength", &m_simulationMesh.m_windStrength, 0.05f, 4.0f);
+            ImGui::SliderFloat("Ball Radius", &m_simulationMesh.m_sphere.m_radius, 0.1f, 2.5f);
+            ImGui::SliderFloat("Timestep Factor", &NaiveClothInternals::TIMESTEP_FACTOR, 0.1f, 4.0f);
+
+            /*
+            {
+                ImGui::Widget::HorizontalBox hb(ctx);
+                text.printf("Solver Iterations : %d", NaiveClothInternals::SOLVER_ITER);
+                ImGui::Widget::Label(ctx, text.cString());
+                float si = (float)NaiveClothInternals::SOLVER_ITER;
+                ImGui::Widget::Spacer(ctx, 1.0f, .0f);
+                ImGui::Widget::Spinner(ctx, si, 1.0f);
+                NaiveClothInternals::SOLVER_ITER = (int)hkMath::clamp(si, 1.0f, 8.0f);
+            }
+
+            ImGui::Widget::Spacer(ctx, 0.0f, 2.0f);
+            text.printf("Base Stiffness: %0.3f", NaiveClothInternals::BASE_STIFFNESS);
+            ImGui::Widget::Label(ctx, text.cString());
+            ImGui::Widget::Slider(ctx, NaiveClothInternals::BASE_STIFFNESS, 0.1f, 1.0f, sliderWidth);
+            text.printf("Substiffness: %0.4f", NaiveClothInternals::COMPUTED_SUBSTIFFNESS);
+            ImGui::Widget::Label(ctx, text.cString(), hkColors::DarkBlue);
+            */
+        }
     }
 
-    std::shared_ptr<RenderMesh> m_mesh;
+    void UpdateAndRenderClothMesh()
+    {
+        // first time, create buffers
+        if (!m_renderMesh->m_vb)
+        {
+            const int ndim = NaiveClothInternals::CLOTH_DIM;
+            VertexPositionNormalTexture nulldata[ndim*ndim];
+            ZeroMemory(nulldata, sizeof(nulldata));
+            m_renderMesh->CreateVB(ndim*ndim, sizeof(VertexPositionNormalTexture), true,nulldata);
+
+            int c = 0;
+            const int NINDICES = (ndim - 1) * (ndim - 1) * 6;
+            uint32_t indices[NINDICES];
+            for (int j = 0; j < ndim - 1; ++j)
+            {
+                for (int i = 0; i < ndim - 1; ++i)
+                {
+                    indices[c++] = NaiveClothInternals::PINDEX(i, j);
+                    indices[c++] = NaiveClothInternals::PINDEX(i + 1, j);
+                    indices[c++] = NaiveClothInternals::PINDEX(i + 1, j + 1);
+                    indices[c++] = NaiveClothInternals::PINDEX(i, j);
+                    indices[c++] = NaiveClothInternals::PINDEX(i + 1, j + 1);
+                    indices[c++] = NaiveClothInternals::PINDEX(i, j + 1);
+                }
+            }
+            m_renderMesh->CreateIB(NINDICES, sizeof(uint32_t), indices);
+        }
+
+        // update VB
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
+        if (SUCCEEDED(m_framework->m_pd3dDeviceContext->Map(m_renderMesh->m_vb.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)))
+        {
+            VertexPositionNormalTexture* verts = (VertexPositionNormalTexture*)mappedResource.pData;
+            for (auto& par : m_simulationMesh.m_particles )
+            {
+                verts->position = par.m_pos;
+                ++verts;
+            }
+            m_framework->m_pd3dDeviceContext->Unmap(m_renderMesh->m_vb.Get(), 0);
+        }
+
+
+        m_framework->RenderObj(*m_renderMesh, RenderMaterial::White, Matrix::Identity);
+    }
+
+    std::shared_ptr<RenderMesh> m_renderMesh;
+    NaiveClothInternals::ClothMesh m_simulationMesh;
 };
+
+//
+// Implementation of anon namespace
+//
+namespace NaiveClothInternals
+{
+    void ClothMesh::init()
+    {
+        // Init particles positions and masses (we use same mass for demo)
+        // Resting pose, we'll use this pose to compute the initial constraints
+        {
+            float pad = CLOTHWIDTH / CLOTH_DIM;
+            Vector3 p(0, CLOTHWIDTH*0.5f, 0.0f);
+            m_particles.resize(CLOTH_NUM_PARTICLES);
+            ClothParticle* par = m_particles.data();
+            float a = 0.0f;
+            for (int j = 0; j < CLOTH_DIM; ++j)
+            {
+                p.x = -CLOTHWIDTH*0.5f;
+                for (int i = 0; i < CLOTH_DIM; ++i, ++par, a += 0.1f)
+                {
+                    par->m_pos = p;
+                    par->m_prevPos = p;
+                    par->m_collStiffness = 1.0f;
+                    par->m_invMass = 1.0f / CLOTH_PARTICLE_MASS;
+                    par->m_vel = Vector3::Zero;
+                    p.x += pad;
+                }
+                p.y -= pad;
+            }
+
+            // fixed particles (4) in first row (inv mass is 0, representing infinite mass)
+            m_particles[0].m_invMass = 0.0f;
+            m_particles[1].m_invMass = 0.0f;
+            m_particles[CLOTH_DIM / 2].m_invMass = 0.0f;
+            m_particles[CLOTH_DIM / 2 + 1].m_invMass = 0.0f;
+            m_particles[CLOTH_DIM - 2].m_invMass = 0.0f;
+            m_particles[CLOTH_DIM - 1].m_invMass = 0.0f;
+        }
+
+        // Init distance constraints
+        {
+            memset(m_distanceConstraints, 0, sizeof(m_distanceConstraints));
+            int index = 0;
+
+            // horizontal links
+            for (uint16_t j = 0; j < CLOTH_DIM; ++j)
+            {
+                for (uint16_t i = 0; i < (CLOTH_DIM - 1); ++i, ++index)
+                {
+                    _buildDistanceConstraint(PINDEX(i, j), PINDEX(i + 1, j), index);
+                }
+            }
+
+            // vertical links
+            for (uint16_t i = 0; i < CLOTH_DIM; ++i)
+            {
+                for (uint16_t j = 0; j < (CLOTH_DIM - 1); ++j, ++index)
+                {
+                    _buildDistanceConstraint(PINDEX(i, j), PINDEX(i, j + 1), index);
+                }
+            }
+
+            // diagonal links
+            for (uint16_t j = 0; j < (CLOTH_DIM - 1); ++j)
+            {
+                for (uint16_t i = 0; i < (CLOTH_DIM - 1); ++i, ++index)
+                {
+                    if (i % 2)
+                        _buildDistanceConstraint(PINDEX(i, j), PINDEX(i + 1, j + 1), index++);
+                    else
+                        _buildDistanceConstraint(PINDEX(i + 1, j), PINDEX(i, j + 1), index);
+                }
+            }
+        }
+
+        // Init collidables
+        {
+            m_sphere.m_center = Vector3(0, 0, -5.0f);
+            m_sphere.m_radius = 0.75f;
+        }
+
+        m_simTime = 0.0f;
+        m_windEnabled = 0;
+        m_sphereAnimated = false;
+        m_windStrength = 2.5f;
+    }
+
+    void ClothMesh::display()
+    {
+        /*
+        for (uint16_t j = 0; j < (CLOTH_DIM - 1); ++j)
+        {
+            for (uint16_t i = 0; i < (CLOTH_DIM - 1); ++i)
+            {
+                const ClothParticle& a = m_particles[PINDEX(i, j)];
+                const ClothParticle& b = m_particles[PINDEX(i + 1, j)];
+                const ClothParticle& c = m_particles[PINDEX(i + 1, j + 1)];
+                const ClothParticle& d = m_particles[PINDEX(i, j + 1)];
+
+                HK_DISPLAY_LIT_TRIANGLE(a.m_pos, b.m_pos, c.m_pos, 0xff4040ff);
+                HK_DISPLAY_LIT_TRIANGLE(a.m_pos, c.m_pos, d.m_pos, 0xff4040ff);
+
+                HK_DISPLAY_LIT_TRIANGLE(a.m_pos, c.m_pos, b.m_pos, 0xffff4050);
+                HK_DISPLAY_LIT_TRIANGLE(a.m_pos, d.m_pos, c.m_pos, 0xffff4050);
+            }
+        }
+        */
+        // points
+        //         const int np = CLOTH_DIM*CLOTH_DIM;
+        //         const ClothParticle* p = m_particles.begin();
+        //         for (int i = 0; i < np; ++i, ++p)
+        //             if ( p->m_collStiffness >1.0f )
+        //             HK_DISPLAY_STAR(p->m_pos, 0.02f, hkColor::CYAN);
+
+        /* //wireframe
+        for (int c = 0; c < CLOTH_NUM_DISTANCE_CONSTRAINTS; ++c)
+        {
+        const ConstraintDistance& cd = m_distanceConstraints[c];
+        if (cd.m_particleA == cd.m_particleB) continue;
+        ClothParticle& A = m_particles[cd.m_particleA];
+        ClothParticle& B = m_particles[cd.m_particleB];
+        HK_DISPLAY_LINE(A.m_pos, B.m_pos, 0xff505080);
+        }
+        */
+
+        //HK_DISPLAY_SPHERE(m_sphere.getPosition(), m_sphere.getRadius(), hkColor::RED);
+    }
+
+    // a sample force field that varies in time to represent the wind force, integrated to get accel
+    void ClothMesh::_windFieldAccel(const Vector3& xyz, float time, float invPMass, Vector3& accelOut)
+    {
+        if (!m_windEnabled)
+        {
+            accelOut = Vector3::Zero;
+            return;
+        }
+
+        Vector3 windForce;
+        windForce.x = sin((time + xyz.x)*4.0f)*0.5f;
+        windForce.y = cos((time + xyz.y)*4.0f);
+        windForce.z = std::max(0.0f, sin((xyz.x + time)*4.0f));
+
+        // Euler integrate force
+        accelOut = windForce * m_windStrength * invPMass * abs(sin(time*0.4f));
+    }
+
+
+    void ClothMesh::step(float timestep)
+    {
+        // External force is gravity (wind, ...)
+        const Vector3 gravityAccel(0, -9.80f, 0.0f);
+
+        //
+        // Solving
+        //
+        const float subStiffness = powf(SOLVER_ITER, -1.8f*(1.0f - BASE_STIFFNESS)*1.0f / TIMESTEP_FACTOR);
+        COMPUTED_SUBSTIFFNESS = subStiffness;
+        const float subTimestep = timestep / SOLVER_ITER;
+        for (int solverIt = 0; solverIt < SOLVER_ITER; ++solverIt)
+        {
+            //
+            // Symplectic Euler integration (accel->vel->pos)
+            //
+            {
+                ClothParticle* par = m_particles.data();
+                for (int i = 0; i < CLOTH_NUM_PARTICLES; ++i, ++par)
+                {
+                    if (par->m_invMass == 0.0f) continue;
+                    // accumulate accelerations
+                    Vector3 accumAccel;
+                    _windFieldAccel(par->m_pos, m_simTime, par->m_invMass, accumAccel);
+                    accumAccel += gravityAccel;
+
+                    // sympletic Euler integration
+                    par->m_prevPos = par->m_pos;
+                    par->m_collStiffness = 1.0f;
+                    par->m_vel += accumAccel * subTimestep; // accel -> vel
+                    par->m_pos += par->m_vel * subTimestep; // vel -> pos
+                }
+            }
+
+            // Collision against objects
+            _generateCollisionConstraints();
+
+            // solve (collision) constraints
+            for (size_t c = 0; c < m_collisionConstraints.size(); ++c)
+            {
+                const ConstraintCollisionParticleSphere& cc = m_collisionConstraints[c];
+                ClothParticle& par = m_particles[cc.m_particle];
+                par.m_pos = cc.m_hitPoint;
+            }
+
+            // solve (distance) constraints
+            for (int c = 0; c < CLOTH_NUM_DISTANCE_CONSTRAINTS; ++c)
+            {
+                const ConstraintDistance& cd = m_distanceConstraints[c];
+                ClothParticle& A = m_particles[cd.m_particleA];
+                ClothParticle& B = m_particles[cd.m_particleB];
+                if (cd.m_particleA == cd.m_particleB) continue;
+                const float sumMasses = A.m_invMass + B.m_invMass;
+                if (sumMasses == 0.0f) continue;
+                float invSumMass = 1.0f / sumMasses;
+
+                Vector3 normal; normal = B.m_pos - A.m_pos;
+                const float distance = normal.Length();
+                normal *= 1.0f / distance;
+                const float factor = invSumMass * (distance - cd.m_restDistance);
+                const float stiffA = clamp(subStiffness * A.m_collStiffness, 0.0f, 1.01f);
+                const float stiffB = clamp(subStiffness * B.m_collStiffness, 0.0f, 1.01f);
+                const float deltaPA = A.m_invMass * factor * stiffA;
+                A.m_pos += normal * deltaPA;
+                const float deltaPB = -B.m_invMass * factor * stiffB;
+                B.m_pos += normal * deltaPB;
+            }
+
+            // update velocities with exact delta Position
+            {
+                ClothParticle* par = m_particles.data();
+                const float invTimestep = 1.0f / subTimestep;
+                for (int i = 0; i < CLOTH_NUM_PARTICLES; ++i, ++par)
+                {
+                    Vector3 deltaP = par->m_pos - par->m_prevPos;
+                    par->m_vel = deltaP * invTimestep;
+                }
+            }
+
+            m_simTime += subTimestep;
+        }
+
+
+        // Just animate the sphere
+        if (m_sphereAnimated)
+        {
+            m_sphere.m_center = Vector3(sin(m_simTime), 0, cos(m_simTime*0.25f*(1.0f / TIMESTEP_FACTOR))*5.0f);
+        }
+    }
+
+    void ClothMesh::_buildDistanceConstraint(uint16_t iA, uint16_t iB, int at)
+    {
+        const Vector3& pA = m_particles[iA].m_pos;
+        const Vector3& pB = m_particles[iB].m_pos;
+        Vector3 pAB = pB - pA;
+        ConstraintDistance& cd = m_distanceConstraints[at];
+        cd.m_particleA = iA;
+        cd.m_particleB = iB;
+        cd.m_restDistance = pAB.Length();
+    }
+
+    void ClothMesh::_generateCollisionConstraints()
+    {
+        m_collisionConstraints.clear();
+        ConstraintCollisionParticleSphere cc;
+        ClothParticle* par = m_particles.data();
+        Vector3 toSph;
+        float extraRad = 0.05f;
+        const float finalRad = m_sphere.m_radius + extraRad;
+        const float sphRadSq = finalRad*finalRad;
+        for (int i = 0; i < CLOTH_NUM_PARTICLES; ++i, ++par)
+        {
+            if (par->m_invMass == 0.0f) continue;
+
+            toSph = par->m_pos - m_sphere.m_center;
+            const float distanceToSphereSq = toSph.LengthSquared();
+            if (distanceToSphereSq < sphRadSq)
+            {
+                Vector3 dir = m_sphere.m_center - par->m_prevPos;
+                const float distanceToSphFromPrev = dir.Length();
+                dir *= 1.0f / distanceToSphFromPrev;
+                if (distanceToSphFromPrev > .0f)
+                {
+                    cc.m_hitPoint = par->m_prevPos +  dir * (distanceToSphFromPrev - sqrtf(sphRadSq));
+                    //cc.m_normal.setNeg3(dir);
+                    cc.m_particle = uint16_t(i);
+                    par->m_collStiffness = 2.0f;
+                    m_collisionConstraints.push_back(cc);
+                }
+            }
+        }
+    }
+}; // ns
+
 
 DEMO(ClothSimpleDemo, "Simple Cloth", "This demo shows basic Distance and Collision Constraints");

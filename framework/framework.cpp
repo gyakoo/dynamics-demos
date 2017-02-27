@@ -56,7 +56,7 @@ HRESULT DemoFramework::Init(const wchar_t* title, int width, int height, bool fu
         sd.SampleDesc.Count = 1;
         sd.SampleDesc.Quality = 0;
         sd.Windowed = !fullscreen;
-        sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+        sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;        
     }
 
     UINT createDeviceFlags = 0;
@@ -117,9 +117,10 @@ HRESULT DemoFramework::Init(const wchar_t* title, int width, int height, bool fu
     InitResources();
 
     // camera
-    m_view.CreateLookAt(Vector3(0, 0.0f, -5.0f), Vector3::Zero, Vector3::UnitY);
-    m_proj.CreatePerspectiveFieldOfView(50.0f*XM_PI / 180.0f, float(width) / height, 0.05f, 100.0f);
+    m_camera.SetView(Vector3(0, 0.0f, -25.0f), Vector3::Zero, Vector3::UnitY);
+    m_camera.SetProj(50.0f*XM_PI / 180.0f, float(width) / height, 0.05f, 100.0f);
 
+    m_timeStep = 1.0f / 60.0f; // default timestep for demo framework
     for (auto& d : m_demos)
         d->OnInitFramework();
     return S_OK;
@@ -182,16 +183,31 @@ HRESULT DemoFramework::InitResources()
 
     // other states
     {
-        D3D11_SAMPLER_DESC desc = {  };
-        desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-        desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-        desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-        desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-        desc.MaxAnisotropy = (m_pd3dDevice->GetFeatureLevel() > D3D_FEATURE_LEVEL_9_1) ? D3D11_MAX_MAXANISOTROPY : 2;
-        desc.MaxLOD = FLT_MAX;
-        desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-        HRESULT hr = m_pd3dDevice->CreateSamplerState(&desc, m_linearClamp.ReleaseAndGetAddressOf());
-        if (FAILED(hr)) return hr;
+        {
+            D3D11_SAMPLER_DESC desc = {  };
+            desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+            desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+            desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+            desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+            desc.MaxAnisotropy = (m_pd3dDevice->GetFeatureLevel() > D3D_FEATURE_LEVEL_9_1) ? D3D11_MAX_MAXANISOTROPY : 2;
+            desc.MaxLOD = FLT_MAX;
+            desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+            HRESULT hr = m_pd3dDevice->CreateSamplerState(&desc, m_linearClamp.ReleaseAndGetAddressOf());
+            if (FAILED(hr)) return hr;
+        }
+
+        {
+            D3D11_BLEND_DESC desc = {};
+            desc.RenderTarget[0].BlendEnable = FALSE;
+            desc.RenderTarget[0].SrcBlend = desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+            desc.RenderTarget[0].DestBlend = desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+            desc.RenderTarget[0].BlendOp = desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+
+            desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+            HRESULT hr = m_pd3dDevice->CreateBlendState(&desc, m_opaque.ReleaseAndGetAddressOf());
+            if (FAILED(hr)) return hr;
+        }
     }
 
     // default materials
@@ -238,9 +254,10 @@ void DemoFramework::RenderObj(const RenderMesh& rm, const RenderMaterial& mat, c
     UINT offset = 0;
     m_pd3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_pd3dDeviceContext->IASetInputLayout(m_ilPNT.Get());
+    m_pd3dDeviceContext->OMSetBlendState(m_opaque.Get(), nullptr, 0xffffffff);
 
-    // VS
-    XMFLOAT4X4 mvpData[3] = {m_view, m_proj, transform};
+    // VS    
+    XMFLOAT4X4 mvpData[3] = { transform, m_camera.m_view, m_camera.m_proj};
     m_pd3dDeviceContext->UpdateSubresource(m_cbMVP.Get(), 0, NULL, mvpData, 0, 0);
     m_pd3dDeviceContext->VSSetShader(m_vsPNT.Get(), nullptr, 0);
     m_pd3dDeviceContext->VSSetConstantBuffers(0, 1, m_cbMVP.GetAddressOf());
@@ -256,7 +273,7 @@ void DemoFramework::RenderObj(const RenderMesh& rm, const RenderMaterial& mat, c
     // Draw the object
     {
         m_pd3dDeviceContext->IASetVertexBuffers(0, 1, rm.m_vb.GetAddressOf(), &stride, &offset);
-        m_pd3dDeviceContext->IASetIndexBuffer(rm.m_ib.Get(), DXGI_FORMAT_R32_UINT, 0);
+        m_pd3dDeviceContext->IASetIndexBuffer(rm.m_ib.Get(), rm.m_isize == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT, 0);
         m_pd3dDeviceContext->DrawIndexed(rm.m_icount, 0, 0);        
     }
 }
@@ -271,6 +288,56 @@ void DemoFramework::PreRender()
 void DemoFramework::PostRender()
 {
 
+}
+
+void Camera::SetView(const Vector3& eye, const Vector3& at, const Vector3& up )
+{
+    m_view = Matrix::CreateLookAt(eye, at, up).Transpose();
+    m_position = eye;
+    Vector3 fw = -m_view.Forward();
+    m_pitchYawRoll.y = atan2f(fw.x, fw.z);
+    //if (m_pitchYawRoll.y < 0.0f) m_pitchYawRoll.y += XM_PI;
+    //m_pitchYawRoll.x = atan2f(fw.y, fw.x);
+    //if (m_pitchYawRoll.x < 0.0f) m_pitchYawRoll.x += XM_PI;
+}
+
+void Camera::SetProj(float fovYRad, float aspect, float _near, float _far)
+{
+    m_proj = Matrix::CreatePerspectiveFieldOfView(fovYRad, aspect, _near, _far).Transpose();
+}
+
+static inline float sign(int d)
+{
+    return float((d > 0) - (d < 0));
+}
+
+void Camera::_ComputeView()
+{
+    XMMATRIX ry = XMMatrixRotationY(m_pitchYawRoll.y);
+    XMMATRIX rx = XMMatrixRotationX(m_pitchYawRoll.x);
+    XMMATRIX t = XMMatrixTranslation(-m_position.x, -m_position.y, -m_position.z);
+    XMMATRIX m = XMMatrixMultiply(ry, rx);
+    m_view = XMMatrixTranspose( XMMatrixMultiply(t, m) );
+}
+
+void Camera::DeltaMouse(int dx, int dy)
+{
+    DemoFramework* df = DemoFramework::GetInstance();
+    m_pitchYawRoll.y -= sign(dx) * XM_PIDIV2 * df->m_timeStep;
+    m_pitchYawRoll.x -= sign(dy) * XM_PIDIV2* df->m_timeStep;
+    _ComputeView();
+}
+
+void Camera::AdvanceForward(float d)
+{
+    m_position += m_view.Forward()*d;
+    _ComputeView();
+}
+
+void Camera::AdvanceRight(float d)
+{
+    m_position += m_view.Right()*d;
+    _ComputeView();
 }
 
 RenderMaterial RenderMaterial::White( Vector4(1,0,0,1) );

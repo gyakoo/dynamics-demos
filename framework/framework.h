@@ -84,11 +84,32 @@ struct VertexPositionNormalTexture
     static const D3D11_INPUT_ELEMENT_DESC InputElements[InputElementCount];
 };
 
+class Camera
+{
+public:
+    Camera()
+        : m_pitchYawRoll(Vector3::Zero)
+    {
+    }
+
+    void SetView(const Vector3& eye, const Vector3& at, const Vector3& up = Vector3::UnitY);
+    void SetProj(float fovYRad, float aspect, float _near, float _far);
+    void DeltaMouse(int dx, int dy);
+    void AdvanceForward(float d);
+    void AdvanceRight(float d);
+    void _ComputeView();
+
+    Matrix m_view;
+    Matrix m_proj;
+    Vector3 m_pitchYawRoll;
+    Vector3 m_position;
+};
+
 class DemoFramework
 {
 public:
 
-    static DemoFramework* GetInstance()
+    static inline DemoFramework* GetInstance()
     {
         static DemoFramework s_instance;
         return &s_instance;
@@ -128,7 +149,20 @@ public:
                     return E_FAIL;
                 continue;
             }
-            const float rgba[4] = { 0.5f, 0.5f, 0.9f, 1.0f };
+
+
+            if ( ImGui::GetIO().KeysDown['W'] )
+                m_camera.AdvanceForward(m_timeStep * 50.0f);
+            else if (ImGui::GetIO().KeysDown['S'])
+                m_camera.AdvanceForward(-m_timeStep * 50.0f);
+
+            if (ImGui::GetIO().KeysDown['A'])
+                m_camera.AdvanceRight(-m_timeStep * 50.0f);
+            else if (ImGui::GetIO().KeysDown['D'])
+                m_camera.AdvanceRight(m_timeStep * 50.0f);
+
+
+            const float rgba[4] = { 0.0f, 0.0f, 0.3f, 1.0f };
             m_pd3dDeviceContext->ClearRenderTargetView(m_mainRenderTargetView, rgba);
 
             PreRender();
@@ -143,7 +177,7 @@ public:
             ImGui_ImplDX11_NewFrame();
             RenderGui();
             ImGui::Render();
-            m_pSwapChain->Present(0, 0);
+            m_pSwapChain->Present(1, 0);
         }
         return S_OK;
     }
@@ -218,6 +252,7 @@ public:
     }
 
     int m_width, m_height;
+    float                    m_timeStep;
     ID3D11Device*            m_pd3dDevice;
     ID3D11DeviceContext*     m_pd3dDeviceContext;
     IDXGISwapChain*          m_pSwapChain;
@@ -228,9 +263,8 @@ public:
     ComPtr<ID3D11Buffer>      m_cbMVP;
     ComPtr<ID3D11Buffer>      m_cbF4;
     ComPtr<ID3D11SamplerState> m_linearClamp;
-
-    Matrix m_view;
-    Matrix m_proj;
+    ComPtr<ID3D11BlendState> m_opaque;
+    Camera m_camera;
 protected:
 
     void CreateRenderTarget()
@@ -257,10 +291,30 @@ protected:
 
     static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {
+        DemoFramework* instance = DemoFramework::GetInstance();
+        static int lastMouseXPos = 0;
+        static int lastMouseYPos = 0;
+        switch (msg)
+        {
+            case WM_MOUSEMOVE:
+            {
+                if (wParam == MK_RBUTTON)
+                {
+                    const int xPos = LOWORD(lParam);
+                    const int yPos = HIWORD(lParam);
+                    const int deltaX = lastMouseXPos - xPos;
+                    const int deltaY = lastMouseYPos - yPos;
+                    if (deltaX || deltaY)
+                        instance->m_camera.DeltaMouse(deltaX, deltaY);
+                    lastMouseXPos = xPos;
+                    lastMouseYPos = yPos;
+                }
+            }break;
+        }
+
         if (ImGui_ImplDX11_WndProcHandler(hWnd, msg, wParam, lParam))
             return true;
-
-        DemoFramework* instance = DemoFramework::GetInstance();
+        
         switch (msg)
         {
         case WM_SIZE:
@@ -277,7 +331,7 @@ protected:
         case WM_SYSCOMMAND:
             if ((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
                 return 0;
-            break;
+            break;        
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
@@ -320,6 +374,7 @@ public:
     inline void CreateIB(int numIndices, int indexSize, void* initData=nullptr)
     {
         m_icount = numIndices;
+        m_isize = indexSize;
         _CreateBuff(numIndices, indexSize, D3D11_BIND_INDEX_BUFFER,
             D3D11_USAGE_DEFAULT, initData, m_ib);        
     }
@@ -336,6 +391,7 @@ public:
     ComPtr<ID3D11Buffer> m_ib;
     int m_vcount, m_vsize;
     int m_icount;
+    int m_isize;
     bool m_vdyn;
 
 private:
@@ -345,9 +401,8 @@ private:
         bd.pSysMem = id;
         bd.SysMemPitch = 0;
         bd.SysMemSlicePitch = 0;
-        CD3D11_BUFFER_DESC extbd((UINT)(n*s),(UINT)f0, (D3D11_USAGE)f1);
-        HRESULT hr = D3DDEVICE->CreateBuffer(&extbd, id ? &bd : nullptr,
-            b.ReleaseAndGetAddressOf());
+        CD3D11_BUFFER_DESC extbd((UINT)(n*s),(UINT)f0, (D3D11_USAGE)f1, f1 ? D3D11_CPU_ACCESS_WRITE : 0);
+        HRESULT hr = D3DDEVICE->CreateBuffer(&extbd, &bd, b.ReleaseAndGetAddressOf());
         assert(hr == S_OK);
     }
 
