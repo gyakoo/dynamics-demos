@@ -3,7 +3,7 @@
 
 namespace NaiveClothInternals
 {
-    static int SOLVER_ITER = 3;
+    static int SOLVER_ITER = 2;
     static float CLOTH_PARTICLE_MASS = 0.05f;
     static float TIMESTEP_FACTOR = 1.1f;
     static float BASE_STIFFNESS = 1.0f;
@@ -12,9 +12,8 @@ namespace NaiveClothInternals
     
     enum    
     {
-        CLOTH_DIM = 16,
+        CLOTH_DIM = 24,
         CLOTH_NUM_PARTICLES = CLOTH_DIM*CLOTH_DIM,
-        CLOTH_NUM_DISTANCE_CONSTRAINTS = (2 * (CLOTH_DIM - 1)*(2 * CLOTH_DIM - 1)) // each particle with its neighbors
     };
 
     static inline uint16_t PINDEX(uint16_t i, uint16_t j)
@@ -61,7 +60,7 @@ namespace NaiveClothInternals
     {
         //ClothParticle m_particles[CLOTH_NUM_PARTICLES];
         std::vector<ClothParticle> m_particles;
-        ConstraintDistance m_distanceConstraints[CLOTH_NUM_DISTANCE_CONSTRAINTS];
+        std::vector<ConstraintDistance> m_distanceConstraints;
         std::vector<ConstraintCollisionParticleSphere> m_collisionConstraints;
 
         void init();
@@ -69,7 +68,7 @@ namespace NaiveClothInternals
         void display();
 
         void _windFieldAccel(const Vector3& xyz, float time, float invPMass, Vector3& accelOut);
-        void _buildDistanceConstraint(uint16_t iA, uint16_t iB, int at);
+        void _buildDistanceConstraint(uint16_t iA, uint16_t iB);
         void _generateCollisionConstraints();
 
         float m_simTime;
@@ -153,6 +152,11 @@ public:
         }
     }
 
+    inline Vector3 FaceNormalNoNorm(const Vector3& a, const Vector3& b, const Vector3& c)
+    {
+        return (b - a).Cross(c - a);
+    }
+
     void UpdateAndRenderClothMesh()
     {
         // first time, create buffers
@@ -175,20 +179,20 @@ public:
 
             int c = 0;
             const int NINDICES = (ndim - 1) * (ndim - 1) * 6;
-            uint32_t indices[NINDICES];
+            m_ibCpu.resize(NINDICES);
             for (int j = 0; j < ndim - 1; ++j)
             {
                 for (int i = 0; i < ndim - 1; ++i)
                 {
-                    indices[c++] = NaiveClothInternals::PINDEX(i, j);
-                    indices[c++] = NaiveClothInternals::PINDEX(i + 1, j);
-                    indices[c++] = NaiveClothInternals::PINDEX(i + 1, j + 1);
-                    indices[c++] = NaiveClothInternals::PINDEX(i, j);
-                    indices[c++] = NaiveClothInternals::PINDEX(i + 1, j + 1);
-                    indices[c++] = NaiveClothInternals::PINDEX(i, j + 1);
+                    m_ibCpu[c++] = NaiveClothInternals::PINDEX(i, j);
+                    m_ibCpu[c++] = NaiveClothInternals::PINDEX(i + 1, j);
+                    m_ibCpu[c++] = NaiveClothInternals::PINDEX(i + 1, j + 1);
+                    m_ibCpu[c++] = NaiveClothInternals::PINDEX(i, j);
+                    m_ibCpu[c++] = NaiveClothInternals::PINDEX(i + 1, j + 1);
+                    m_ibCpu[c++] = NaiveClothInternals::PINDEX(i, j + 1);
                 }
             }
-            m_renderMesh->CreateIB(NINDICES, sizeof(uint32_t), indices);
+            m_renderMesh->CreateIB(NINDICES, sizeof(uint32_t), m_ibCpu.data());
         }
 
         // update VB
@@ -197,12 +201,34 @@ public:
         if (SUCCEEDED(m_framework->m_pd3dDeviceContext->Map(m_renderMesh->m_vb.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)))
         {
             VertexPositionNormalTexture* verts = (VertexPositionNormalTexture*)mappedResource.pData;
-            for (auto& par : m_simulationMesh.m_particles )
+            const auto& pts = m_simulationMesh.m_particles;
+            for (auto& par : pts)
             {
-                verts->position = par.m_pos;
-                verts->normal = Vector3(0, 0, -1);
+                verts->position = par.m_pos;                
+                verts->normal = Vector3::Zero;
                 ++verts;
             }
+
+            verts = (VertexPositionNormalTexture*)mappedResource.pData;
+            Vector3 fn;
+            for (size_t i = 0; i < m_ibCpu.size(); )
+            {
+                const auto ia = m_ibCpu[i++]; const auto& a = pts[ia];
+                const auto ib = m_ibCpu[i++]; const auto& b = pts[ib];
+                const auto ic = m_ibCpu[i++]; const auto& c = pts[ic];
+                fn = FaceNormalNoNorm(a.m_pos, b.m_pos, c.m_pos);
+                verts[ia].normal += fn;
+                verts[ib].normal += fn;
+                verts[ic].normal += fn;
+            }
+
+            // normalize normals
+            for (size_t i = 0; i < pts.size(); ++i)
+            {
+                verts->normal.Normalize();
+                ++verts;
+            }
+
             m_framework->m_pd3dDeviceContext->Unmap(m_renderMesh->m_vb.Get(), 0);
         }
 
@@ -212,6 +238,7 @@ public:
 
     std::shared_ptr<RenderMesh> m_renderMesh;
     NaiveClothInternals::ClothMesh m_simulationMesh;
+    std::vector<uint32_t> m_ibCpu;
 };
 
 //
@@ -255,36 +282,36 @@ namespace NaiveClothInternals
 
         // Init distance constraints
         {
-            memset(m_distanceConstraints, 0, sizeof(m_distanceConstraints));
-            int index = 0;
-
             // horizontal links
             for (uint16_t j = 0; j < CLOTH_DIM; ++j)
             {
-                for (uint16_t i = 0; i < (CLOTH_DIM - 1); ++i, ++index)
+                for (uint16_t i = 0; i < (CLOTH_DIM - 1); ++i)
                 {
-                    _buildDistanceConstraint(PINDEX(i, j), PINDEX(i + 1, j), index);
+                    _buildDistanceConstraint(PINDEX(i, j), PINDEX(i + 1, j));
                 }
             }
 
             // vertical links
             for (uint16_t i = 0; i < CLOTH_DIM; ++i)
             {
-                for (uint16_t j = 0; j < (CLOTH_DIM - 1); ++j, ++index)
+                for (uint16_t j = 0; j < (CLOTH_DIM - 1); ++j)
                 {
-                    _buildDistanceConstraint(PINDEX(i, j), PINDEX(i, j + 1), index);
+                    _buildDistanceConstraint(PINDEX(i, j), PINDEX(i, j + 1));
                 }
             }
 
             // diagonal links
             for (uint16_t j = 0; j < (CLOTH_DIM - 1); ++j)
             {
-                for (uint16_t i = 0; i < (CLOTH_DIM - 1); ++i, ++index)
+                //if (j % 2 == 0)
                 {
-                    if (i % 2)
-                        _buildDistanceConstraint(PINDEX(i, j), PINDEX(i + 1, j + 1), index++);
-                    else
-                        _buildDistanceConstraint(PINDEX(i + 1, j), PINDEX(i, j + 1), index);
+                    for (uint16_t i = 0; i < (CLOTH_DIM - 1); ++i)
+                    {
+                        if (i % 2)
+                            _buildDistanceConstraint(PINDEX(i, j), PINDEX(i + 1, j + 1));
+                        else
+                            _buildDistanceConstraint(PINDEX(i + 1, j), PINDEX(i, j + 1));
+                    }
                 }
             }
         }
@@ -407,9 +434,8 @@ namespace NaiveClothInternals
             }
 
             // solve (distance) constraints
-            for (int c = 0; c < CLOTH_NUM_DISTANCE_CONSTRAINTS; ++c)
+            for (const ConstraintDistance& cd : m_distanceConstraints)
             {
-                const ConstraintDistance& cd = m_distanceConstraints[c];
                 ClothParticle& A = m_particles[cd.m_particleA];
                 ClothParticle& B = m_particles[cd.m_particleB];
                 if (cd.m_particleA == cd.m_particleB) continue;
@@ -451,15 +477,16 @@ namespace NaiveClothInternals
         }
     }
 
-    void ClothMesh::_buildDistanceConstraint(uint16_t iA, uint16_t iB, int at)
+    void ClothMesh::_buildDistanceConstraint(uint16_t iA, uint16_t iB)
     {
         const Vector3& pA = m_particles[iA].m_pos;
         const Vector3& pB = m_particles[iB].m_pos;
         Vector3 pAB = pB - pA;
-        ConstraintDistance& cd = m_distanceConstraints[at];
+        ConstraintDistance cd;
         cd.m_particleA = iA;
         cd.m_particleB = iB;
         cd.m_restDistance = pAB.Length();
+        m_distanceConstraints.push_back(cd);
     }
 
     void ClothMesh::_generateCollisionConstraints()

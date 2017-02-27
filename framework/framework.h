@@ -63,22 +63,15 @@ struct VertexPositionNormalTexture
 {
     VertexPositionNormalTexture() = default;
 
-    VertexPositionNormalTexture(XMFLOAT3 const& position, XMFLOAT3 const& normal, XMFLOAT2 const& textureCoordinate)
+    VertexPositionNormalTexture(Vector3 const& position, Vector3 const& normal, Vector2 const& textureCoordinate)
         : position(position),
         normal(normal),
         textureCoordinate(textureCoordinate)
     { }
 
-    VertexPositionNormalTexture(FXMVECTOR position, FXMVECTOR normal, FXMVECTOR textureCoordinate)
-    {
-        XMStoreFloat3(&this->position, position);
-        XMStoreFloat3(&this->normal, normal);
-        XMStoreFloat2(&this->textureCoordinate, textureCoordinate);
-    }
-
-    XMFLOAT3 position;
-    XMFLOAT3 normal;
-    XMFLOAT2 textureCoordinate;
+    Vector3 position;
+    Vector3 normal;
+    Vector2 textureCoordinate;
 
     static const int InputElementCount = 3;
     static const D3D11_INPUT_ELEMENT_DESC InputElements[InputElementCount];

@@ -1,5 +1,6 @@
 pdb-cloth.vcxproj.user
 Debug/
+Release/
 .vs
 ipch/
 *.db
