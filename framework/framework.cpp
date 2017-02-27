@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "framework.h"
+#include <shellapi.h>
 
 const D3D11_INPUT_ELEMENT_DESC VertexPositionNormalTexture::InputElements[] =
 {
@@ -88,6 +89,17 @@ HRESULT DemoFramework::Init(const wchar_t* title, int width, int height, bool fu
         m_pd3dDeviceContext->RSSetState(pRState);
         pRState->Release(); // not going to need it anymore?
 
+        // Setup viewport
+        D3D11_VIEWPORT vp;
+        memset(&vp, 0, sizeof(D3D11_VIEWPORT));
+        vp.Width = m_width;
+        vp.Height = m_height;
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        vp.TopLeftX = 0;
+        vp.TopLeftY = 0;
+        m_pd3dDeviceContext->RSSetViewports(1, &vp);
+
         D3D11_DEPTH_STENCIL_DESC DSDesc;
         DSDesc.DepthEnable = true;
         DSDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
@@ -123,6 +135,26 @@ HRESULT DemoFramework::Init(const wchar_t* title, int width, int height, bool fu
     m_timeStep = 1.0f / 60.0f; // default timestep for demo framework
     for (auto& d : m_demos)
         d->OnInitFramework();
+
+    // command line
+    {
+        int nargs = 0;
+        wchar_t** args = CommandLineToArgvW(GetCommandLineW(), &nargs);
+        for (int i = 1; i < nargs; ++i)
+        {
+            if (wcscmp(args[i], L"-d") == 0 && (i+1)<nargs )
+            {
+                int d = _wtoi(args[i + 1]);
+                if (d < (int)m_demos.size())
+                {
+                    m_demos[d]->m_running = true;
+                    m_demos[d]->OnInitDemo();
+                }
+                ++i;
+            }
+        }
+        LocalFree(args);
+    }
     return S_OK;
 }
 
@@ -282,7 +314,7 @@ void DemoFramework::PreRender()
 {
     const D3D11_RECT r = { 0,0,m_width,m_height };
 
-    m_pd3dDeviceContext->RSSetScissorRects(1, &r);
+    m_pd3dDeviceContext->RSSetScissorRects(1,&r);
 }
 
 void DemoFramework::PostRender()
@@ -340,4 +372,4 @@ void Camera::AdvanceRight(float d)
     _ComputeView();
 }
 
-RenderMaterial RenderMaterial::White( Vector4(1,0,0,1) );
+RenderMaterial RenderMaterial::White( Vector4(1,1,1,1));

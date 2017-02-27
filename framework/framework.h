@@ -173,10 +173,9 @@ public:
                     d->OnStepDemo();
             }
             PostRender();
-
             ImGui_ImplDX11_NewFrame();
             RenderGui();
-            ImGui::Render();
+            ImGui::Render();            
             m_pSwapChain->Present(1, 0);
         }
         return S_OK;
@@ -197,6 +196,7 @@ public:
         //window_flags |= ImGuiWindowFlags_NoCollapse;
         //window_flags |= ImGuiWindowFlags_MenuBar;
         static bool opened = true;
+        ImGui::SetNextWindowPos(ImVec2(m_width - 500, 10), ImGuiSetCond_FirstUseEver);
         if (!ImGui::Begin("Demo Framework", &opened, ImVec2(400, 400), 0.65f, window_flags))
         {
             ImGui::End();
@@ -416,7 +416,7 @@ class RenderMaterial
 {
 public:
     RenderMaterial(const Vector4& modColor)
-        : m_modulateColor(1,1,1,1)
+        : m_modulateColor(modColor)
     {
     }
 

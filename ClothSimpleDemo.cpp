@@ -103,9 +103,6 @@ public:
 
     virtual void OnStepDemo() override
     {
-        // Render Cloth Mesh
-        m_framework->RenderObj(*m_renderMesh.get(), RenderMaterial::White, Matrix::Identity);
-
         const float timeStep = m_framework->m_timeStep * NaiveClothInternals::TIMESTEP_FACTOR;
         m_simulationMesh.step(timeStep);
 
@@ -163,7 +160,17 @@ public:
         {
             const int ndim = NaiveClothInternals::CLOTH_DIM;
             VertexPositionNormalTexture nulldata[ndim*ndim];
-            ZeroMemory(nulldata, sizeof(nulldata));
+            VertexPositionNormalTexture* v = nulldata;
+            for ( int j = 0; j < ndim; ++j )
+            {
+                for (int i = 0; i < ndim; ++i, ++v)
+                {
+                    v->textureCoordinate.x = float(i) / (ndim - 1);
+                    v->textureCoordinate.y = float(j) / (ndim - 1);
+                    v->normal = Vector3(0, 0, -1);
+                    v->position = Vector3::Zero;
+                }
+            }
             m_renderMesh->CreateVB(ndim*ndim, sizeof(VertexPositionNormalTexture), true,nulldata);
 
             int c = 0;
@@ -193,6 +200,7 @@ public:
             for (auto& par : m_simulationMesh.m_particles )
             {
                 verts->position = par.m_pos;
+                verts->normal = Vector3(0, 0, -1);
                 ++verts;
             }
             m_framework->m_pd3dDeviceContext->Unmap(m_renderMesh->m_vb.Get(), 0);
