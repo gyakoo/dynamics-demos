@@ -3,7 +3,7 @@
 
 namespace NaiveClothInternals
 {
-    static int SOLVER_ITER = 2;
+    static int SOLVER_ITER = 3;
     static float CLOTH_PARTICLE_MASS = 0.05f;
     static float TIMESTEP_FACTOR = 1.1f;
     static float BASE_STIFFNESS = 1.0f;
@@ -12,7 +12,7 @@ namespace NaiveClothInternals
     
     enum    
     {
-        CLOTH_DIM = 24,
+        CLOTH_DIM = 32,
         CLOTH_NUM_PARTICLES = CLOTH_DIM*CLOTH_DIM,
     };
 
