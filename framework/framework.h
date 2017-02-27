@@ -58,6 +58,30 @@ public:
     bool m_running;
 };
 
+class Stopwatch
+{
+public:
+    Stopwatch()
+    {
+        QueryPerformanceFrequency(&m_ticksPerSecond);
+    }
+
+    void Start()
+    {
+        QueryPerformanceCounter(&m_t0);
+    }
+
+    double Stop()
+    {
+        LARGE_INTEGER t1;
+        QueryPerformanceCounter(&t1);
+        return (t1.QuadPart - m_t0.QuadPart) * 1000.0 / m_ticksPerSecond.QuadPart;
+    }
+
+    LARGE_INTEGER m_ticksPerSecond;
+    LARGE_INTEGER m_t0;
+};
+
 // Vertex struct holding position, normal vector, and texture mapping information.
 struct VertexPositionNormalTexture
 {
@@ -112,6 +136,7 @@ public:
         : m_pd3dDevice(nullptr)
         , m_pd3dDeviceContext(nullptr)
         , m_pSwapChain(nullptr)
+        , m_stepCount(0)
     {
     }
 
@@ -169,6 +194,7 @@ public:
             RenderGui();
             ImGui::Render();            
             m_pSwapChain->Present(1, 0);
+            m_stepCount++;
         }
         return S_OK;
     }
@@ -243,8 +269,9 @@ public:
         m_demos.push_back(demo);
     }
 
-    int m_width, m_height;
+    int                      m_width, m_height;
     float                    m_timeStep;
+    int                      m_stepCount;
     ID3D11Device*            m_pd3dDevice;
     ID3D11DeviceContext*     m_pd3dDeviceContext;
     IDXGISwapChain*          m_pSwapChain;
@@ -258,6 +285,7 @@ public:
     ComPtr<ID3D11SamplerState> m_linearClamp;
     ComPtr<ID3D11BlendState> m_opaque;
     Camera m_camera;
+    Stopwatch m_stopWatch;
 protected:
 
     void CreateRenderTarget()

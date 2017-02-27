@@ -84,6 +84,8 @@ class ClothSimpleDemo : public Demo
 {
 public:
     ClothSimpleDemo()
+        : m_simTime(0)
+        , m_renderTime(0)
     {
     }
 
@@ -102,10 +104,14 @@ public:
 
     virtual void OnStepDemo() override
     {
+        m_clock.Start();
         const float timeStep = m_framework->m_timeStep * NaiveClothInternals::TIMESTEP_FACTOR;
         m_simulationMesh.step(timeStep);
+        m_simTime = m_clock.Stop();
 
+        m_clock.Start();
         UpdateAndRenderClothMesh();
+        m_renderTime = m_clock.Stop();
     }
 
     virtual void OnRenderGuiSetup() override
@@ -122,6 +128,9 @@ public:
         const int height = 380;        
         {
             static char text[128];
+
+            ImGui::LabelText("Time", "Simulation/Render: %.3f/%.3f", m_simTime, m_renderTime);
+
             ImGui::Checkbox("Wind", &m_simulationMesh.m_windEnabled);
             ImGui::Checkbox("Animate bal", &m_simulationMesh.m_sphereAnimated);
 
@@ -196,40 +205,43 @@ public:
         }
 
         // update VB
-        D3D11_MAPPED_SUBRESOURCE mappedResource;
-        ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
-        if (SUCCEEDED(m_framework->m_pd3dDeviceContext->Map(m_renderMesh->m_vb.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)))
+        //if (m_framework->m_stepCount == 0)
         {
-            VertexPositionNormalTexture* verts = (VertexPositionNormalTexture*)mappedResource.pData;
-            const auto& pts = m_simulationMesh.m_particles;
-            for (auto& par : pts)
+            D3D11_MAPPED_SUBRESOURCE mappedResource;
+            ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
+            if (SUCCEEDED(m_framework->m_pd3dDeviceContext->Map(m_renderMesh->m_vb.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource)))
             {
-                verts->position = par.m_pos;                
-                verts->normal = Vector3::Zero;
-                ++verts;
-            }
+                VertexPositionNormalTexture* verts = (VertexPositionNormalTexture*)mappedResource.pData;
+                const auto& pts = m_simulationMesh.m_particles;
+                for (auto& par : pts)
+                {
+                    verts->position = par.m_pos;
+                    verts->normal = Vector3::Zero;
+                    ++verts;
+                }
 
-            verts = (VertexPositionNormalTexture*)mappedResource.pData;
-            Vector3 fn;
-            for (size_t i = 0; i < m_ibCpu.size(); )
-            {
-                const auto ia = m_ibCpu[i++]; const auto& a = pts[ia];
-                const auto ib = m_ibCpu[i++]; const auto& b = pts[ib];
-                const auto ic = m_ibCpu[i++]; const auto& c = pts[ic];
-                fn = FaceNormalNoNorm(a.m_pos, b.m_pos, c.m_pos);
-                verts[ia].normal += fn;
-                verts[ib].normal += fn;
-                verts[ic].normal += fn;
-            }
+                verts = (VertexPositionNormalTexture*)mappedResource.pData;
+                Vector3 fn;
+                for (size_t i = 0; i < m_ibCpu.size(); )
+                {
+                    const auto ia = m_ibCpu[i++]; const auto& a = pts[ia];
+                    const auto ib = m_ibCpu[i++]; const auto& b = pts[ib];
+                    const auto ic = m_ibCpu[i++]; const auto& c = pts[ic];
+                    fn = FaceNormalNoNorm(a.m_pos, b.m_pos, c.m_pos);
+                    verts[ia].normal += fn;
+                    verts[ib].normal += fn;
+                    verts[ic].normal += fn;
+                }
 
-            // normalize normals
-            for (size_t i = 0; i < pts.size(); ++i)
-            {
-                verts->normal.Normalize();
-                ++verts;
-            }
+                // normalize normals
+                for (size_t i = 0; i < pts.size(); ++i)
+                {
+                    verts->normal.Normalize();
+                    ++verts;
+                }
 
-            m_framework->m_pd3dDeviceContext->Unmap(m_renderMesh->m_vb.Get(), 0);
+                m_framework->m_pd3dDeviceContext->Unmap(m_renderMesh->m_vb.Get(), 0);
+            }
         }
 
 
@@ -239,6 +251,8 @@ public:
     std::shared_ptr<RenderMesh> m_renderMesh;
     NaiveClothInternals::ClothMesh m_simulationMesh;
     std::vector<uint32_t> m_ibCpu;
+    Stopwatch m_clock;
+    double m_simTime, m_renderTime;
 };
 
 //
