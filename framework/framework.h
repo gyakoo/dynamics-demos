@@ -256,6 +256,7 @@ public:
     }
 
     void RenderObj(const RenderMesh& rm, const RenderMaterial& mat, const Matrix& transform);
+    void CreateRenderSphere(float radius, int nsubdiv, RenderMesh& outMesh);
     
     std::vector<std::shared_ptr<Demo>> m_demos;
     

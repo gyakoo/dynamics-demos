@@ -322,6 +322,33 @@ void DemoFramework::PostRender()
 
 }
 
+void DemoFramework::CreateRenderSphere(float radius, int nsubdiv, RenderMesh& outMesh)
+{
+    // Create an unit cube. subdivision of its 6 faces by nsubdiv
+    // iterate all vertices in the unit cube and compute the normal from the center
+    // normalize normal and scale by radius
+    const int dim = nsubdiv + 1;
+    const int npoints = dim*dim* 6;    
+    std::vector<VertexPositionNormalTexture> vertices; vertices.reserve(npoints);
+    VertexPositionNormalTexture v;
+    float d = 1.0f / nsubdiv;
+    float x = -0.5f;
+    float y = 0.5f;
+    for (int j = 0; j < dim; ++j)
+    {
+        x = -0.5f;
+        for (int i = 0; i < dim; ++i)
+        {
+            v.position = Vector3(x, y, -0.5f); vertices.push_back(v); // front
+            x += d;
+        }
+        y += d;
+    }
+
+    const int nindices = nsubdiv*nsubdiv * 2 * 3 * 6;
+    std::vector<uint16_t> indices; indices.reserve(nindices);
+}
+
 void Camera::SetView(const Vector3& eye, const Vector3& at, const Vector3& up )
 {
     m_view = Matrix::CreateLookAt(eye, at, up).Transpose();

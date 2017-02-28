@@ -3,7 +3,7 @@
 
 namespace NaiveClothInternals
 {
-    static int SOLVER_ITER = 3;
+    static int SOLVER_ITER = 1;
     static float CLOTH_PARTICLE_MASS = 0.05f;
     static float TIMESTEP_FACTOR = 1.1f;
     static float BASE_STIFFNESS = 1.0f;
@@ -65,7 +65,6 @@ namespace NaiveClothInternals
 
         void init();
         void step(float timestep);
-        void display();
 
         void _windFieldAccel(const Vector3& xyz, float time, float invPMass, Vector3& accelOut);
         void _buildDistanceConstraint(uint16_t iA, uint16_t iB);
@@ -129,10 +128,10 @@ public:
         {
             static char text[128];
 
-            ImGui::LabelText("Time", "Simulation/Render: %.3f/%.3f", m_simTime, m_renderTime);
+            ImGui::LabelText("", "Simulation/Render: %.3f/%.3f", m_simTime, m_renderTime);
 
             ImGui::Checkbox("Wind", &m_simulationMesh.m_windEnabled);
-            ImGui::Checkbox("Animate bal", &m_simulationMesh.m_sphereAnimated);
+            ImGui::Checkbox("Animate ball", &m_simulationMesh.m_sphereAnimated);
 
             // 
             const int sliderWidth = 200;
@@ -340,47 +339,6 @@ namespace NaiveClothInternals
         m_windEnabled = 0;
         m_sphereAnimated = false;
         m_windStrength = 2.5f;
-    }
-
-    void ClothMesh::display()
-    {
-        /*
-        for (uint16_t j = 0; j < (CLOTH_DIM - 1); ++j)
-        {
-            for (uint16_t i = 0; i < (CLOTH_DIM - 1); ++i)
-            {
-                const ClothParticle& a = m_particles[PINDEX(i, j)];
-                const ClothParticle& b = m_particles[PINDEX(i + 1, j)];
-                const ClothParticle& c = m_particles[PINDEX(i + 1, j + 1)];
-                const ClothParticle& d = m_particles[PINDEX(i, j + 1)];
-
-                HK_DISPLAY_LIT_TRIANGLE(a.m_pos, b.m_pos, c.m_pos, 0xff4040ff);
-                HK_DISPLAY_LIT_TRIANGLE(a.m_pos, c.m_pos, d.m_pos, 0xff4040ff);
-
-                HK_DISPLAY_LIT_TRIANGLE(a.m_pos, c.m_pos, b.m_pos, 0xffff4050);
-                HK_DISPLAY_LIT_TRIANGLE(a.m_pos, d.m_pos, c.m_pos, 0xffff4050);
-            }
-        }
-        */
-        // points
-        //         const int np = CLOTH_DIM*CLOTH_DIM;
-        //         const ClothParticle* p = m_particles.begin();
-        //         for (int i = 0; i < np; ++i, ++p)
-        //             if ( p->m_collStiffness >1.0f )
-        //             HK_DISPLAY_STAR(p->m_pos, 0.02f, hkColor::CYAN);
-
-        /* //wireframe
-        for (int c = 0; c < CLOTH_NUM_DISTANCE_CONSTRAINTS; ++c)
-        {
-        const ConstraintDistance& cd = m_distanceConstraints[c];
-        if (cd.m_particleA == cd.m_particleB) continue;
-        ClothParticle& A = m_particles[cd.m_particleA];
-        ClothParticle& B = m_particles[cd.m_particleB];
-        HK_DISPLAY_LINE(A.m_pos, B.m_pos, 0xff505080);
-        }
-        */
-
-        //HK_DISPLAY_SPHERE(m_sphere.getPosition(), m_sphere.getRadius(), hkColor::RED);
     }
 
     // a sample force field that varies in time to represent the wind force, integrated to get accel
