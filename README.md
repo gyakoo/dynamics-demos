@@ -1,6 +1,6 @@
 # pdb-cloth
 Cloth Simulation based on Position Dynamics solver.
-
+WIP
 Several demos showing:
 * Basic Distance and Collision constraints
 * Force fields (wind)
