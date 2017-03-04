@@ -130,7 +130,7 @@ HRESULT DemoFramework::Init(const wchar_t* title, int width, int height, bool fu
 
     // camera
     m_camera.SetView(Vector3(0, 0.0f, -25.0f), Vector3::Zero, Vector3::UnitY);
-    m_camera.SetProj(50.0f*XM_PI / 180.0f, float(width) / height, 0.05f, 100.0f);
+    m_camera.SetProj(70.0f*XM_PI / 180.0f, float(width) / height, 0.05f, 100.0f);
 
     m_timeStep = 1.0f / 60.0f; // default timestep for demo framework
     for (auto& d : m_demos)
