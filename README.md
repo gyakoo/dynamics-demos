@@ -1,19 +1,17 @@
-# pdb-cloth
-Cloth Simulation based on Position Dynamics solver.
+# dynamics demos
+Several physics based demos
 
-WIP
-
-Several demos showing:
+## cloth simple demo 
 * Basic Distance and Collision constraints
 * Force fields (wind)
 * Iterative solver
 * Slow motion (with Stiffness adjustment)
 * Normal computing
-* Self-collisions
-* Force based response to collisions
+* Self-collisions -wip-
+* Force based response to collisions -wip-
 
 ## Images
 <img src="screengrab.png" width="400px"/>
 
 ## Notes
-GUI by https://github.com/ocornut/imgui
+This project uses Dear <a href="https://github.com/ocornut/imgui">ImGui</a>
