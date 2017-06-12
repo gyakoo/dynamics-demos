@@ -10,7 +10,7 @@ Several physics based demos
 * Normal computing
 
 ## Images
-<img src="screengrab.png" width="400px"/>
+<img src="cloth.gif" width="400px"/>
 
 ## Notes
 This project uses Dear <a href="https://github.com/ocornut/imgui">ImGui</a>
