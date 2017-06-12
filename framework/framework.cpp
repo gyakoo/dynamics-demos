@@ -126,7 +126,8 @@ HRESULT DemoFramework::Init(const wchar_t* title, int width, int height, bool fu
     // Setup ImGui binding
     ImGui_ImplDX11_Init(hwnd, m_pd3dDevice, m_pd3dDeviceContext);
 
-    InitResources();
+	if (FAILED(InitResources()))
+		return E_FAIL;
 
     // camera
     m_camera.SetView(Vector3(0, 0.0f, -25.0f), Vector3::Zero, Vector3::UnitY);

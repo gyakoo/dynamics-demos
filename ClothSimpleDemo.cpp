@@ -3,12 +3,12 @@
 
 namespace NaiveClothInternals
 {
-    static int SOLVER_ITER = 1;
+    static int SOLVER_ITER = 2;
     static float CLOTH_PARTICLE_MASS = 0.05f;
     static float TIMESTEP_FACTOR = 1.1f;
     static float BASE_STIFFNESS = 1.0f;
     static float COMPUTED_SUBSTIFFNESS = .0f; // auto computed, just to display
-    static const float CLOTHWIDTH = 8.0f;
+    static const float CLOTHWIDTH = 10.0f;
     
     enum    
     {
