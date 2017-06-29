@@ -20,7 +20,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9F316E83-5AE5-4939-A723-305A94F48005}</ProjectGuid>
-    <RootNamespace>pdb-cloth</RootNamespace>
+    <RootNamespace>dynamics</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

@@ -12,7 +12,7 @@ namespace NaiveClothInternals
     
     enum    
     {
-        CLOTH_DIM = 32,
+        CLOTH_DIM = 16,
         CLOTH_NUM_PARTICLES = CLOTH_DIM*CLOTH_DIM,
     };
 
