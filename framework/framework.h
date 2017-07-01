@@ -214,7 +214,7 @@ public:
         //window_flags |= ImGuiWindowFlags_NoCollapse;
         //window_flags |= ImGuiWindowFlags_MenuBar;
         static bool opened = true;
-        ImGui::SetNextWindowPos(ImVec2(m_width - 500, 10), ImGuiSetCond_FirstUseEver);
+        ImGui::SetNextWindowPos(ImVec2(m_width - 500.0f, 10.0f), ImGuiSetCond_FirstUseEver);
         if (!ImGui::Begin("Demo Framework", &opened, ImVec2(400, 400), 0.65f, window_flags))
         {
             ImGui::End();

@@ -92,8 +92,8 @@ HRESULT DemoFramework::Init(const wchar_t* title, int width, int height, bool fu
         // Setup viewport
         D3D11_VIEWPORT vp;
         memset(&vp, 0, sizeof(D3D11_VIEWPORT));
-        vp.Width = m_width;
-        vp.Height = m_height;
+        vp.Width = (FLOAT)m_width;
+        vp.Height = (FLOAT)m_height;
         vp.MinDepth = 0.0f;
         vp.MaxDepth = 1.0f;
         vp.TopLeftX = 0;

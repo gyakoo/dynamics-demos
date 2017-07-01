@@ -368,7 +368,7 @@ namespace NaiveClothInternals
         //
         // Solving
         //
-        const float subStiffness = powf(SOLVER_ITER, -1.8f*(1.0f - BASE_STIFFNESS)*1.0f / TIMESTEP_FACTOR);
+        const float subStiffness = powf(float(SOLVER_ITER), -1.8f*(1.0f - BASE_STIFFNESS)*1.0f / TIMESTEP_FACTOR);
         COMPUTED_SUBSTIFFNESS = subStiffness;
         const float subTimestep = timestep / SOLVER_ITER;
         for (int solverIt = 0; solverIt < SOLVER_ITER; ++solverIt)
