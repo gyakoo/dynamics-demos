@@ -4,6 +4,7 @@
 
 RenderMesh::RenderMesh()
     : m_vcount(0), m_vsize(0), m_vdyn(false), m_icount(0)
+    , m_topo(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST)
 {
 }
 

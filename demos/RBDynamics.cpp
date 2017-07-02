@@ -12,6 +12,7 @@ public:
     virtual void OnRenderGui() override;
 
 protected:
+    RenderMesh m_obj;
     double m_simTime;
     double m_renderTime;
 };
@@ -25,6 +26,7 @@ RBDynamics::RBDynamics()
 void RBDynamics::OnInitDemo()
 {
     m_framework->m_timeStep = 1.0f / 60.0f;
+    m_framework->CreateRenderSphere(1.0f, 8.0f, m_obj);
 }
 
 void RBDynamics::OnDestroyDemo()
@@ -50,6 +52,7 @@ void RBDynamics::OnRenderGui()
 
 void RBDynamics::OnStepDemo()
 {
+    m_framework->RenderObj(m_obj, RenderMaterial::White, Matrix::Identity);
 
 }
 

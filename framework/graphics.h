@@ -37,6 +37,7 @@ private:
 public:
     ComPtr<ID3D11Buffer> m_vb;
     ComPtr<ID3D11Buffer> m_ib;
+    D3D11_PRIMITIVE_TOPOLOGY m_topo;
     int m_vcount, m_vsize;
     int m_icount;
     int m_isize;

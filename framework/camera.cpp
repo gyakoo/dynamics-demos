@@ -40,14 +40,24 @@ void Camera::DeltaMouse(int dx, int dy)
     _ComputeView();
 }
 
+void Camera::WheelMouse(int dir)
+{
+    if (dir > 0)
+        m_advanceFactor += 0.01f;
+    else
+        m_advanceFactor -= 0.01f;
+
+    m_advanceFactor = clamp(m_advanceFactor, 0.01f, 1.0f);
+}
+
 void Camera::AdvanceForward(float d)
 {
-    m_position += m_view.Forward()*d;
+    m_position += m_view.Forward()*d*m_advanceFactor;
     _ComputeView();
 }
 
 void Camera::AdvanceRight(float d)
 {
-    m_position += m_view.Right()*d;
+    m_position += m_view.Right()*d*m_advanceFactor;
     _ComputeView();
 }

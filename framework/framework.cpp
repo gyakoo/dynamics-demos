@@ -83,11 +83,12 @@ HRESULT DemoFramework::Init(const wchar_t* title, int width, int height, bool fu
         RSDesc.ScissorEnable = TRUE;
         RSDesc.AntialiasedLineEnable = FALSE;
         RSDesc.MultisampleEnable = (sd.SampleDesc.Count > 1) ? TRUE : FALSE;
+        m_pd3dDevice->CreateRasterizerState(&RSDesc, m_fillSolid.GetAddressOf());
+        m_pd3dDeviceContext->RSSetState(m_fillSolid.Get());
 
-        ID3D11RasterizerState* pRState = NULL;
-        m_pd3dDevice->CreateRasterizerState(&RSDesc, &pRState);
-        m_pd3dDeviceContext->RSSetState(pRState);
-        pRState->Release(); // not going to need it anymore?
+        RSDesc.FillMode = D3D11_FILL_WIREFRAME;
+        RSDesc.AntialiasedLineEnable = TRUE;
+        m_pd3dDevice->CreateRasterizerState(&RSDesc, m_fillWireframe.GetAddressOf());
 
         // Setup viewport
         D3D11_VIEWPORT vp;
@@ -285,7 +286,7 @@ void DemoFramework::RenderObj(const RenderMesh& rm, const RenderMaterial& mat, c
     // Prepare the constant buffer to send it to the graphics device.
     const UINT stride = sizeof(VertexPositionNormalTexture);
     UINT offset = 0;
-    m_pd3dDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    m_pd3dDeviceContext->IASetPrimitiveTopology(rm.m_topo);
     m_pd3dDeviceContext->IASetInputLayout(m_ilPNT.Get());
     m_pd3dDeviceContext->OMSetBlendState(m_opaque.Get(), nullptr, 0xffffffff);
 
@@ -306,8 +307,15 @@ void DemoFramework::RenderObj(const RenderMesh& rm, const RenderMaterial& mat, c
     // Draw the object
     {
         m_pd3dDeviceContext->IASetVertexBuffers(0, 1, rm.m_vb.GetAddressOf(), &stride, &offset);
-        m_pd3dDeviceContext->IASetIndexBuffer(rm.m_ib.Get(), rm.m_isize == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT, 0);
-        m_pd3dDeviceContext->DrawIndexed(rm.m_icount, 0, 0);        
+        if (rm.m_ib)
+        {
+            m_pd3dDeviceContext->IASetIndexBuffer(rm.m_ib.Get(), rm.m_isize == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT, 0);
+            m_pd3dDeviceContext->DrawIndexed(rm.m_icount, 0, 0);
+        }
+        else
+        {
+            m_pd3dDeviceContext->Draw(rm.m_vcount, 0);
+        }
     }
 }
 
@@ -316,6 +324,7 @@ void DemoFramework::PreRender()
     const D3D11_RECT r = { 0,0,m_width,m_height };
 
     m_pd3dDeviceContext->RSSetScissorRects(1,&r);
+    m_pd3dDeviceContext->RSSetState(m_wireframe ? m_fillWireframe.Get() : m_fillSolid.Get());
 }
 
 void DemoFramework::PostRender()
@@ -331,22 +340,64 @@ void DemoFramework::CreateRenderSphere(float radius, int nsubdiv, RenderMesh& ou
     const int dim = nsubdiv + 1;
     const int npoints = dim*dim* 6;    
     std::vector<VertexPositionNormalTexture> vertices; vertices.reserve(npoints);
-    VertexPositionNormalTexture v;
-    float d = 1.0f / nsubdiv;
-    float x = -0.5f;
-    float y = 0.5f;
-    for (int j = 0; j < dim; ++j)
-    {
-        x = -0.5f;
-        for (int i = 0; i < dim; ++i)
-        {
-            v.position = Vector3(x, y, -0.5f); vertices.push_back(v); // front
-            x += d;
-        }
-        y += d;
-    }
+    typedef VertexPositionNormalTexture vpnt;
+    typedef Vector3 v3;
+    const float r = radius;
+    // front
+    vertices.push_back(vpnt(v3(-r, -r, -r), v3(0, 0, -1), Vector2::Zero));
+    vertices.push_back(vpnt(v3(-r,  r, -r), v3(0, 0, -1), Vector2::Zero));
+    vertices.push_back(vpnt(v3( r,  r, -r), v3(0, 0, -1), Vector2::Zero));
 
-    const int nindices = nsubdiv*nsubdiv * 2 * 3 * 6;
-    std::vector<uint16_t> indices; indices.reserve(nindices);
+    vertices.push_back(vpnt(v3(-r, -r, -r), v3(0, 0, -1), Vector2::Zero));
+    vertices.push_back(vpnt(v3(r, r, -r), v3(0, 0, -1), Vector2::Zero));
+    vertices.push_back(vpnt(v3( r, -r, -r), v3(0, 0, -1), Vector2::Zero));
+
+    // top
+    vertices.push_back(vpnt(v3(-r, r, -r), v3(0, 1, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(-r, r,  r), v3(0, 1, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(r,  r,  r), v3(0, 1, 0), Vector2::Zero));
+
+    vertices.push_back(vpnt(v3(-r, r, -r), v3(0, 1, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(r, r, r), v3(0, 1, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(r,  r, -r), v3(0, 1, 0), Vector2::Zero));
+
+    // back
+    vertices.push_back(vpnt(v3(r, r,  r), v3(0, 0, 1), Vector2::Zero));
+    vertices.push_back(vpnt(v3(r, -r, r), v3(0, 0, 1), Vector2::Zero));
+    vertices.push_back(vpnt(v3(-r,-r, r), v3(0, 0, 1), Vector2::Zero));
+
+    vertices.push_back(vpnt(v3(r, r, r), v3(0, 0, 1), Vector2::Zero));
+    vertices.push_back(vpnt(v3(-r, -r, r), v3(0, 0, 1), Vector2::Zero));
+    vertices.push_back(vpnt(v3(-r, r, r), v3(0, 0, 1), Vector2::Zero));
+
+    // bottom
+    vertices.push_back(vpnt(v3(-r, -r, -r), v3(0, -1, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(-r, -r, r), v3(0, -1, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3( r, -r, r), v3(0, -1, 0), Vector2::Zero));
+
+    vertices.push_back(vpnt(v3(-r, -r, -r), v3(0, -1, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(r, -r, r), v3(0, -1, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3( r, -r, -r), v3(0, -1, 0), Vector2::Zero));
+
+    // left
+    vertices.push_back(vpnt(v3(-r, -r, r), v3(-1, 0, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(-r, r, r), v3(-1, 0, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(-r, r, -r), v3(-1, 0, 0), Vector2::Zero));
+
+    vertices.push_back(vpnt(v3(-r, -r, r), v3(-1, 0, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(-r, r, -r), v3(-1, 0, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(-r, -r, -r), v3(-1, 0, 0), Vector2::Zero));
+
+    // right
+    vertices.push_back(vpnt(v3(r, -r, -r), v3(1, 0, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(r, r, -r), v3(1, 0, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(r, r, r), v3(1, 0, 0), Vector2::Zero));
+
+    vertices.push_back(vpnt(v3(r, -r, -r), v3(1, 0, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(r, r, r), v3(1, 0, 0), Vector2::Zero));
+    vertices.push_back(vpnt(v3(r, -r, r), v3(1, 0, 0), Vector2::Zero));
+    
+
+    outMesh.CreateVB(vertices.size(), sizeof(vpnt), false, vertices.data());
 }
 

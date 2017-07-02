@@ -76,3 +76,8 @@ using namespace Microsoft::WRL;
 #define OutputDebugString(a) __debugbreak()
 #endif
 
+template<typename V>
+inline V clamp(const V& v, const V& t, const V& q)
+{
+    return v < t ? t : (v>q ? q : v);
+}

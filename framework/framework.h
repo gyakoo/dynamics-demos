@@ -52,6 +52,7 @@ public:
         , m_pd3dDeviceContext(nullptr)
         , m_pSwapChain(nullptr)
         , m_stepCount(0)
+        , m_wireframe(false)
     {
     }
 
@@ -137,7 +138,7 @@ public:
         }
 
         ImGui::Text("Select a demo below");
-
+        ImGui::Checkbox("Wireframe", &m_wireframe);
         for (auto& d : m_demos)
         {
             if (ImGui::CollapsingHeader(d->m_name.c_str()))
@@ -213,6 +214,9 @@ public:
     ComPtr<ID3D11Buffer>      m_cbF4;
     ComPtr<ID3D11SamplerState> m_linearClamp;
     ComPtr<ID3D11BlendState> m_opaque;
+    ComPtr<ID3D11RasterizerState> m_fillSolid;
+    ComPtr<ID3D11RasterizerState> m_fillWireframe;
+    bool m_wireframe;
     Camera m_camera;
     Stopwatch m_stopWatch;
 protected:
@@ -291,6 +295,9 @@ protected:
                 lastMouseYPos = yPos;
             }
         }break;
+        case WM_MOUSEWHEEL:
+            instance->m_camera.WheelMouse(GET_WHEEL_DELTA_WPARAM(wParam));
+            break;
         }
 
         if (ImGui_ImplDX11_WndProcHandler(hWnd, msg, wParam, lParam))

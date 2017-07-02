@@ -21,12 +21,6 @@ namespace NaiveClothInternals
         return (i + j*CLOTH_DIM);
     }
 
-    template<typename V>
-    inline V clamp(const V& v, const V& t, const V& q)
-    {
-        return v < t ? t : (v>q?q:v);
-    }
-
     struct Sphere
     {
         Vector3 m_center;
