@@ -38,6 +38,12 @@
     </ClCompile>
     <ClCompile Include="..\main.cpp" />
     <ClCompile Include="..\pch.cpp" />
+    <ClCompile Include="..\framework\camera.cpp">
+      <Filter>framework</Filter>
+    </ClCompile>
+    <ClCompile Include="..\framework\graphics.cpp">
+      <Filter>framework</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\framework\framework.h">
@@ -68,6 +74,15 @@
       <Filter>imgui</Filter>
     </ClInclude>
     <ClInclude Include="..\pch.h" />
+    <ClInclude Include="..\framework\camera.h">
+      <Filter>framework</Filter>
+    </ClInclude>
+    <ClInclude Include="..\framework\stopwatch.h">
+      <Filter>framework</Filter>
+    </ClInclude>
+    <ClInclude Include="..\framework\graphics.h">
+      <Filter>framework</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="..\framework\PS_PNT.hlsl">

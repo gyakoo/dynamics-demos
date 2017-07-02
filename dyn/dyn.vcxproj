@@ -164,7 +164,9 @@
   <ItemGroup>
     <ClCompile Include="..\demos\ClothSimpleDemo.cpp" />
     <ClCompile Include="..\demos\RBDynamics.cpp" />
+    <ClCompile Include="..\framework\camera.cpp" />
     <ClCompile Include="..\framework\framework.cpp" />
+    <ClCompile Include="..\framework\graphics.cpp" />
     <ClCompile Include="..\framework\SimpleMath.cpp" />
     <ClCompile Include="..\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
@@ -199,8 +201,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\framework\camera.h" />
     <ClInclude Include="..\framework\framework.h" />
+    <ClInclude Include="..\framework\graphics.h" />
     <ClInclude Include="..\framework\SimpleMath.h" />
+    <ClInclude Include="..\framework\stopwatch.h" />
     <ClInclude Include="..\imgui\imconfig.h" />
     <ClInclude Include="..\imgui\imgui.h" />
     <ClInclude Include="..\imgui\imgui_impl_dx11.h" />

@@ -116,10 +116,7 @@ public:
     virtual void OnRenderGuiSetup() override
     {
         static float f = 0.0f;
-        ImGui::Text("Hello, world!");
-        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-        static ImVec4 clear_col = ImColor(114, 144, 154);
-        ImGui::ColorEdit3("clear color", (float*)&clear_col);
+        ImGui::Text("<Cloth setup here>");        
     }
 
     virtual void OnRenderGui() override
@@ -250,7 +247,6 @@ public:
     std::shared_ptr<RenderMesh> m_renderMesh;
     NaiveClothInternals::ClothMesh m_simulationMesh;
     std::vector<uint32_t> m_ibCpu;
-    Stopwatch m_clock;
     double m_simTime, m_renderTime;
 };
 
