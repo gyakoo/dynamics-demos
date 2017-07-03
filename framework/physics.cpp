@@ -2,17 +2,6 @@
 #include "physics.h"
 #include "framework.h"
 
-ShapeBase* ShapeBase::makeSphere(float radius)
-{
-    return new ShapeSphere(radius);
-}
-
-ShapeBase* ShapeBase::makeBox(const Vector3& halfExtents)
-{
-    return new ShapeBox(halfExtents);
-}
-
-
 
 ShapeSphere::ShapeSphere(float radius)
     : ShapeBase(SHAPE_SPHERE), m_radius(radius)
@@ -85,6 +74,46 @@ ShapeBase* ShapeBox::clone() const
 {
     return nullptr;
 }
+
+int PhysicsWorld::CreateShapeSphere(float radius)
+{
+    auto s = std::make_shared<ShapeSphere>(radius);
+    int ret = m_shapes.size();
+    if (!m_shapesFreeList.empty())
+    {
+        ret = m_shapesFreeList.back();
+        m_shapesFreeList.pop_back();
+        m_shapes[ret] = s;
+    }
+    else
+    {
+        m_shapes.push_back(s);
+    }
+    return ret;
+}
+
+int PhysicsWorld::CreateShapeBox(const Vector3& halfExtents)
+{
+    auto s = std::make_shared<ShapeBox>(halfExtents);
+    int ret = m_shapes.size();
+    if (!m_shapesFreeList.empty())
+    {
+        ret = m_shapesFreeList.back();
+        m_shapesFreeList.pop_back();
+        m_shapes[ret] = s;
+    }
+    else
+    {
+        m_shapes.push_back(s);
+    }
+    return ret;
+}
+
+int PhysicsWorld::CreateBody(int shape, const Matrix& transform, const Vector3& linearVel, const Vector3& angVel)
+{
+
+}
+
 
 
 float GjkDistance(Shape& a, Shape& b, GjkOutput* out)

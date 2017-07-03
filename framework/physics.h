@@ -38,10 +38,6 @@ struct ShapeBase
     virtual int getNumPlanes() const { return 0; }
     virtual const ShapePlane& getPlane(int index) const { return *(ShapePlane*)(0); }
 
-public: // factory
-    static ShapeBase* makeSphere(float radius);
-    static ShapeBase* makeBox(const Vector3& halfExtents);
-
     Type m_type;
 };
 
@@ -93,6 +89,34 @@ struct ShapeBox : public Shape
 
     virtual float support(const Vector3& dir, Vector3* out) const override;
     virtual ShapeBase* clone() const override;
+};
+
+struct RigidBody
+{
+    Vector3 m_linearVelocity;
+    Vector3 m_angularVelocity;
+    Matrix m_transform;
+    int m_shape;
+};
+
+
+class PhysicsWorld
+{
+public:
+
+public:
+    int CreateShapeSphere(float radius);
+    int CreateShapeBox(const Vector3& halfExtents);
+    int CreateBody(int shape, const Matrix& transform, const Vector3& linearVel = Vector3::Zero, const Vector3& angVel = Vector3::Zero);
+
+    inline ShapeBase* GetShape(int index) { return m_shapes[index].get(); }
+    inline RigidBody* GetBody(int index) { return m_bodies[index].get(); }
+
+protected:
+    std::vector<std::shared_ptr<ShapeBase>> m_shapes;
+    std::vector<std::shared_ptr<RigidBody>> m_bodies;
+    std::vector<int> m_shapesFreeList;
+    std::vector<int> m_bodiesFreeList;
 };
 
 

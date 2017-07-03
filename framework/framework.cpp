@@ -52,7 +52,7 @@ HRESULT DemoFramework::Init(const wchar_t* title, int width, int height, bool fu
     // Create application window
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, DemoFramework::WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, LoadCursor(NULL, IDC_ARROW), NULL, NULL, L"demoframework", NULL };
     RegisterClassEx(&wc);
-    HWND hwnd = CreateWindow(L"demoframework", title, WS_OVERLAPPEDWINDOW, 100, 100, width, height, NULL, NULL, wc.hInstance, NULL);
+    HWND hwnd = CreateWindow(L"demoframework", title, WS_MAXIMIZE|WS_OVERLAPPEDWINDOW, 100, 100, width, height, NULL, NULL, wc.hInstance, NULL);
     m_width = width; 
     m_height = height;
     // Setup swap chain

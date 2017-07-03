@@ -114,7 +114,7 @@ int CALLBACK wWinMain(_In_ HINSTANCE , _In_ HINSTANCE , _In_ LPWSTR, _In_ int )\
 {\
     _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);\
     DemoFramework* demoFramework = DemoFramework::GetInstance();\
-    if (SUCCEEDED(demoFramework->Init(L"DemoFramework", 1920, 1080, true)))\
+    if (SUCCEEDED(demoFramework->Init(L"DemoFramework", 1920, 1080, FALSE)))\
     {\
         while (SUCCEEDED(demoFramework->Frame()))\
         {\
