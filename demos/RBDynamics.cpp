@@ -12,7 +12,8 @@ public:
     virtual void OnRenderGui() override;
 
 protected:
-    RenderMesh m_obj;
+    RenderMesh m_sphere;
+    RenderMesh m_box;
     double m_simTime;
     double m_renderTime;
 };
@@ -26,7 +27,8 @@ RBDynamics::RBDynamics()
 void RBDynamics::OnInitDemo()
 {
     m_framework->m_timeStep = 1.0f / 60.0f;
-    m_framework->CreateRenderSphere(1.0f, 8.0f, m_obj);
+    m_framework->CreateRenderSphere(1.0f, 4, m_sphere);
+    m_framework->CreateRenderBox(Vector3(1.0f, 1.0f, 1.0f), m_box);
 }
 
 void RBDynamics::OnDestroyDemo()
@@ -52,8 +54,8 @@ void RBDynamics::OnRenderGui()
 
 void RBDynamics::OnStepDemo()
 {
-    m_framework->RenderObj(m_obj, RenderMaterial::White, Matrix::Identity);
-
+    m_framework->RenderObj(m_box, RenderMaterial::White, Matrix::Identity);
+    m_framework->RenderObj(m_sphere, RenderMaterial::White, Matrix::CreateTranslation(0, 1.0f, 0.0f) );
 }
 
 DEMO(RBDynamics, "Rigid Body Dynamics", "This demo shows basic Rigid Bodies");

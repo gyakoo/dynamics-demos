@@ -4,7 +4,7 @@ class Camera
 {
 public:
     Camera()
-        : m_pitchYawRoll(Vector3::Zero), m_advanceFactor(0.5f)
+        : m_pitchYawRoll(Vector3::Zero), m_advanceFactor(0.3f)
     {
     }
 

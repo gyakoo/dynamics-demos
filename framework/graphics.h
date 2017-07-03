@@ -1,5 +1,8 @@
 #pragma once
 
+template<typename T>
+void SubdivideFaces(std::vector<T>& vertices);
+
 // Vertex struct holding position, normal vector, and texture mapping information.
 struct VertexPositionNormalTexture
 {
@@ -55,3 +58,45 @@ public:
 
     static RenderMaterial White;
 };
+
+
+
+template<typename T>
+void SubdivideFaces<T>(std::vector<T>& vertices)
+{
+    std::vector<T> newVerts;
+    newVerts.reserve(vertices.size() * 2);
+
+    for (size_t i = 0; i < vertices.size(); i += 3)
+    {
+        const T v[3] = { vertices[i], vertices[i + 1], vertices[i + 2] };
+        // computing the vertex with more open angle 
+        const float dots[3] = 
+        {
+            (v[1].position - v[0].position).Dot(v[2].position - v[0].position),
+            (v[2].position - v[1].position).Dot(v[0].position - v[1].position),
+            (v[0].position - v[2].position).Dot(v[1].position - v[2].position) 
+        };
+
+        T d = v[0];
+        if (dots[0] < dots[1] && dots[0] < dots[2])
+        {
+            d.position = (v[1].position + v[2].position)*0.5f;
+            newVerts.push_back(v[0]); newVerts.push_back(v[1]); newVerts.push_back(d);
+            newVerts.push_back(v[0]); newVerts.push_back(d); newVerts.push_back(v[2]);
+        }
+        else if (dots[1] < dots[2] && dots[1] < dots[0])
+        {
+            d.position = (v[2].position + v[0].position)*0.5f;
+            newVerts.push_back(v[0]); newVerts.push_back(v[1]); newVerts.push_back(d);
+            newVerts.push_back(v[1]); newVerts.push_back(v[2]); newVerts.push_back(d);
+        }
+        else
+        {
+            d.position = (v[0].position + v[1].position)*0.5f;
+            newVerts.push_back(v[0]); newVerts.push_back(d); newVerts.push_back(v[2]);
+            newVerts.push_back(d); newVerts.push_back(v[1]); newVerts.push_back(v[2]);
+        }
+    }
+    vertices = std::move(newVerts);
+}
