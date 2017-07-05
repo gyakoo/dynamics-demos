@@ -61,8 +61,30 @@ void RenderMesh::_UpdateBuff(void* data, ComPtr<ID3D11Buffer>& b)
     D3DCONTEXT->UpdateSubresource(b.Get(), 0, 0, data, 0, 0);
 }
 
+RenderMeshLines::RenderMeshLines()
+{
+	m_topo = D3D11_PRIMITIVE_TOPOLOGY_LINELIST;
+}
+
+bool RenderMeshLines::PreRender(RenderMaterial& rm, Matrix& transf) const
+{
+
+	return false;
+}
+
+void RenderMeshLines::PostRender() const
+{
+	m_lines.clear();
+}
+
+void RenderMeshLines::DrawLine(const Vector3& from, const Vector3& to, const Color& color)
+{
+	m_lines.push_back(LineVertex{ from,to,color });
+}
+
+
 RenderMaterial::RenderMaterial(const Vector4& modColor)
-    : m_modulateColor(modColor)
+    : m_modulateColor(modColor), m_vertexStride(sizeof(VertexPositionNormalTexture))
 {
 }
 

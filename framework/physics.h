@@ -28,9 +28,8 @@ struct ShapeBase
 
     }
 
-    virtual float support(const Vector3& dir, Vector3* out) const = 0;
-    virtual ShapeBase* clone() const = 0;
-
+	virtual float support(const Vector3& dir, Vector3* out) const { return FLT_MAX;}
+	virtual ShapeBase* clone() const { return nullptr; }
     virtual bool hasVertices() const { return false; }
     virtual int getNumVertices() const { return 0; }
     virtual const Vertex& getVertex(int index) const { return *(Vertex*)(0); }
@@ -75,7 +74,6 @@ struct ShapeSphere : public ShapeBase
     ShapeSphere(float radius);
 
     virtual float support(const Vector3& dir, Vector3* out) const override;
-    virtual ShapeBase* clone() const override;    
 
     float m_radius;
 };
@@ -88,7 +86,6 @@ struct ShapeBox : public Shape
     ShapeBox(const Vector3& halfExtents);
 
     virtual float support(const Vector3& dir, Vector3* out) const override;
-    virtual ShapeBase* clone() const override;
 };
 
 struct RigidBody

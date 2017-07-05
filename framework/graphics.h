@@ -1,5 +1,7 @@
 #pragma once
 
+class RenderMaterial;
+
 template<typename T>
 void SubdivideFaces(std::vector<T>& vertices);
 
@@ -33,7 +35,10 @@ public:
     void CreateIB(int numIndices, int indexSize, void* initData = nullptr);
     void UpdateVB(void* data);
 
-private:
+	virtual bool PreRender(RenderMaterial& rm, Matrix& transf) const { return true; }
+	virtual void PostRender() const { };
+
+protected:
     void _CreateBuff(int n, int s, int f0, int f1, void* id, ComPtr<ID3D11Buffer>& b);
     void _UpdateBuff(void* data, ComPtr<ID3D11Buffer>& b);
 
@@ -47,6 +52,26 @@ public:
     bool m_vdyn;
 };
 
+class RenderMeshLines : public RenderMesh
+{
+public:
+	RenderMeshLines();
+
+	virtual bool PreRender(RenderMaterial& rm, Matrix& transf) const;
+	virtual void PostRender() const;
+
+	void DrawLine(const Vector3& from, const Vector3& to, const Color& color);
+
+protected:
+	struct LineVertex
+	{
+		Vector3 from, to;
+		Color color;
+	};
+
+	mutable std::vector<LineVertex> m_lines;
+};
+
 class RenderMaterial
 {
 public:
@@ -55,6 +80,10 @@ public:
     Vector4 m_modulateColor;
     ComPtr<ID3D11Texture2D> m_texture0;
     ComPtr<ID3D11ShaderResourceView> m_srv0;
+	ComPtr<ID3D11InputLayout> m_inputLayout;
+	ComPtr<ID3D11VertexShader> m_vertexShader;
+	ComPtr<ID3D11PixelShader> m_pixelShader;
+	UINT m_vertexStride;
 
     static RenderMaterial White;
 };

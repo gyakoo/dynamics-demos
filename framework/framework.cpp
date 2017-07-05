@@ -297,31 +297,37 @@ HRESULT DemoFramework::InitResources()
 
 void DemoFramework::RenderObj(const RenderMesh& rm, const RenderMaterial& mat, const Matrix& transform)
 {
-    // Prepare the constant buffer to send it to the graphics device.
-    const UINT stride = sizeof(VertexPositionNormalTexture);
+	// default for render, can be overridden in PreRender
+	RenderMaterial material = mat;
+	Matrix transformMatrix = transform;	
     UINT offset = 0;
+
+	if (!rm.PreRender(material, transformMatrix))
+		return;
+
+    // Prepare the constant buffer to send it to the graphics device.
     m_pd3dDeviceContext->IASetPrimitiveTopology(rm.m_topo);
-    m_pd3dDeviceContext->IASetInputLayout(m_ilPNT.Get());
+    m_pd3dDeviceContext->IASetInputLayout(material.m_inputLayout ? material.m_inputLayout.Get() : m_ilPNT.Get());
     m_pd3dDeviceContext->OMSetBlendState(m_opaque.Get(), nullptr, 0xffffffff);
 
     // VS        
-    XMFLOAT4X4 mvpData[3] = { transform.Transpose(), m_camera.m_view, m_camera.m_proj};
-    m_pd3dDeviceContext->UpdateSubresource(m_cbMVP.Get(), 0, NULL, mvpData, 0, 0);
-    m_pd3dDeviceContext->VSSetShader(m_vsPNT.Get(), nullptr, 0);
+    const XMFLOAT4X4 mvpData[3] = { transformMatrix.Transpose(), m_camera.m_view, m_camera.m_proj};
+	m_pd3dDeviceContext->VSSetShader(material.m_vertexShader ? material.m_vertexShader.Get() : m_vsPNT.Get(), nullptr, 0);
+	m_pd3dDeviceContext->UpdateSubresource(m_cbMVP.Get(), 0, NULL, mvpData, 0, 0);
     m_pd3dDeviceContext->VSSetConstantBuffers(0, 1, m_cbMVP.GetAddressOf());
 
     // PS
-    m_pd3dDeviceContext->PSSetShader(m_psPNT.Get(), nullptr, 0);
-    m_pd3dDeviceContext->UpdateSubresource(m_cbF4.Get(), 0, NULL, &mat.m_modulateColor, 0, 0);
+    m_pd3dDeviceContext->PSSetShader(material.m_pixelShader ? material.m_pixelShader.Get() : m_psPNT.Get(), nullptr, 0);
+    m_pd3dDeviceContext->UpdateSubresource(m_cbF4.Get(), 0, NULL, &material.m_modulateColor, 0, 0);
     m_pd3dDeviceContext->PSSetConstantBuffers(0, 1,m_cbF4.GetAddressOf());
 
-    m_pd3dDeviceContext->PSSetShaderResources(0, 1, mat.m_srv0.GetAddressOf());
+    m_pd3dDeviceContext->PSSetShaderResources(0, 1, material.m_srv0.GetAddressOf());
     m_pd3dDeviceContext->PSSetSamplers(0, 1, m_linearClamp.GetAddressOf());
 
     // Draw the object
     {
-        m_pd3dDeviceContext->IASetVertexBuffers(0, 1, rm.m_vb.GetAddressOf(), &stride, &offset);
-        if (rm.m_ib)
+        m_pd3dDeviceContext->IASetVertexBuffers(0, 1, rm.m_vb.GetAddressOf(), &material.m_vertexStride, &offset);
+        if (rm.m_ib && rm.m_icount)
         {
             m_pd3dDeviceContext->IASetIndexBuffer(rm.m_ib.Get(), rm.m_isize == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT, 0);
             m_pd3dDeviceContext->DrawIndexed(rm.m_icount, 0, 0);
@@ -331,6 +337,9 @@ void DemoFramework::RenderObj(const RenderMesh& rm, const RenderMaterial& mat, c
             m_pd3dDeviceContext->Draw(rm.m_vcount, 0);
         }
     }
+
+	rm.PostRender();
+
 }
 
 void DemoFramework::PreRender()

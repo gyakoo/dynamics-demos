@@ -87,12 +87,13 @@ public:
         // Create cloth mesh
         m_renderMesh = std::make_shared<RenderMesh>();
         m_simulationMesh.init();
-        m_framework->m_timeStep = 1.0f / 60.0f;
+		m_framework->CreateRenderSphere(m_simulationMesh.m_sphere.m_radius, 4, m_sphereMesh);
+		m_framework->m_timeStep = 1.0f / 60.0f;
     }
 
     virtual void OnDestroyDemo() override
     {
-        m_renderMesh.reset();
+        m_renderMesh.reset();		
     }
 
     virtual void OnStepDemo() override
@@ -104,6 +105,10 @@ public:
 
         m_clock.Start();
         UpdateAndRenderClothMesh();
+		{
+			Matrix t = Matrix::CreateTranslation(m_simulationMesh.m_sphere.m_center);
+			m_framework->RenderObj(m_sphereMesh, RenderMaterial::White, t);
+		}
         m_renderTime = m_clock.Stop();
     }
 
@@ -127,7 +132,8 @@ public:
             // 
             const int sliderWidth = 200;
             ImGui::SliderFloat("Wind Strength", &m_simulationMesh.m_windStrength, 0.05f, 4.0f);
-            ImGui::SliderFloat("Ball Radius", &m_simulationMesh.m_sphere.m_radius, 0.1f, 2.5f);
+			if (ImGui::SliderFloat("Ball Radius", &m_simulationMesh.m_sphere.m_radius, 0.1f, 2.5f))
+				m_framework->CreateRenderSphere(m_simulationMesh.m_sphere.m_radius, 4, m_sphereMesh);
             ImGui::SliderFloat("Timestep Factor", &NaiveClothInternals::TIMESTEP_FACTOR, 0.1f, 4.0f);
 
             /*
@@ -239,6 +245,7 @@ public:
     }
 
     std::shared_ptr<RenderMesh> m_renderMesh;
+	RenderMesh m_sphereMesh;
     NaiveClothInternals::ClothMesh m_simulationMesh;
     std::vector<uint32_t> m_ibCpu;
     double m_simTime, m_renderTime;
@@ -322,7 +329,7 @@ namespace NaiveClothInternals
         // Init collidables
         {
             m_sphere.m_center = Vector3(0, 0, -5.0f);
-            m_sphere.m_radius = 0.75f;
+            m_sphere.m_radius = 1.50f;
         }
 
         m_simTime = 0.0f;

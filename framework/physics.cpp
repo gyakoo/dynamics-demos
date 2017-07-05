@@ -17,11 +17,6 @@ float ShapeSphere::support(const Vector3& dir, Vector3* out) const
     return m_radius;
 }
 
-ShapeBase* ShapeSphere::clone() const
-{
-    return Shape::makeSphere(m_radius);
-}
-
 // --------------------------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------------------------
 ShapeBox::ShapeBox(const Vector3& halfExtents)
@@ -70,11 +65,6 @@ float ShapeBox::support(const Vector3& dir, Vector3* out) const
     return maxD;
 }
 
-ShapeBase* ShapeBox::clone() const
-{
-    return nullptr;
-}
-
 int PhysicsWorld::CreateShapeSphere(float radius)
 {
     auto s = std::make_shared<ShapeSphere>(radius);
@@ -111,12 +101,14 @@ int PhysicsWorld::CreateShapeBox(const Vector3& halfExtents)
 
 int PhysicsWorld::CreateBody(int shape, const Matrix& transform, const Vector3& linearVel, const Vector3& angVel)
 {
-
+	assert(false && "Not implemented");
+	return 0;
 }
 
 
 
 float GjkDistance(Shape& a, Shape& b, GjkOutput* out)
 {
-    return 0;
+	assert(false && "Not implemented");
+	return 0;
 }
